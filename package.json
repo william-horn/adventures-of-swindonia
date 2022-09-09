@@ -5,14 +5,13 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "install": "cd client && npm i && cd ../server && npm i",
-    "server": "cd server && npm run watch",
-    "develop": "concurrently \"cd server && npm run watch\" \"cd client && npm start\""
+    "install": "cd public && npm i && cd ../server && npm i",
+    "server": "concurrently \"cd public && npm run build && npm run watch\"  \"cd server && npm run watch\""
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "dependencies": {
+  "devDependencies": {
     "concurrently": "^7.4.0"
   }
 }
