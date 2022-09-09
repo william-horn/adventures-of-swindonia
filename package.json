@@ -2,11 +2,13 @@
   "name": "swindonia",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/game-bundle.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "install": "cd public && npm i && cd ../server && npm i",
-    "server": "concurrently \"cd public && npm run build && npm run watch\"  \"cd server && npm run watch\""
+    "build": "cd public && npm run build",
+    "server": "concurrently \"cd public && npm run watch\"  \"cd server && npm run watch\"",
+    "dev": "npm run build && npm run server"
   },
   "keywords": [],
   "author": "",

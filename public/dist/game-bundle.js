@@ -8,7 +8,7 @@ const v2 = new Vector3(2, 2, 2);
 
 console.log(v1.add(v2));
 console.log(thing);
-console.log('THESE NUTS HA GOTEEEEM');
+
 },{"./lib/util":2,"@math.gl/core":31}],2:[function(require,module,exports){
 
 const thing = 5;
