@@ -15,9 +15,7 @@ const {
 const gameCanvas = document.getElementById('gameWindow');
 const ctx = gameCanvas.getContext('2d');
 
-const gameState = {
-
-}
+const gameState = {};
 
 const updateGameCanvasSize = () => {
   gameCanvas.width = getGameWidth();
