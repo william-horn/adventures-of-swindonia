@@ -1,22 +1,69 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
 
-const { Vector3 } = require('@math.gl/core');
-const { thing } = require('./lib/util');
+module.exports = {
 
-const v1 = new Vector3(1, 1, 1);
-const v2 = new Vector3(2, 2, 2);
+  getWidth: () => window.innerWidth,
+  getHeight: () => window.innerHeight
 
-console.log(v1.add(v2));
-console.log(thing);
-
-},{"./lib/util":2,"@math.gl/core":31}],2:[function(require,module,exports){
-
-const thing = 5;
-
-module.exports = { thing }
+}
 
 
-},{}],3:[function(require,module,exports){
+},{}],2:[function(require,module,exports){
+
+// game config vars
+const { 
+  getWidth: getGameWidth, 
+  getHeight: getGameHeight 
+} = require('./config/game-settings');
+
+// library imports
+const {
+  vec3,
+  vec2
+} = require('./lib/math-gl-proxy');
+
+// globals
+const gameCanvas = document.getElementById('gameWindow');
+const ctx = gameCanvas.getContext('2d');
+
+const gameState = {
+
+}
+
+const updateGameCanvasSize = () => {
+  gameCanvas.width = getGameWidth();
+  gameCanvas.height = getGameHeight();
+}
+
+// initialization
+const gameStep = timestamp => {
+  ctx.fillRect(0, 0, 100, 50);
+
+  // next frame
+  window.requestAnimationFrame(gameStep);
+}
+
+
+
+// set initial states
+updateGameCanvasSize();
+
+// initialize event listeners
+window.addEventListener('resize', updateGameCanvasSize);
+
+// start game loop
+window.requestAnimationFrame(gameStep);
+
+},{"./config/game-settings":1,"./lib/math-gl-proxy":3}],3:[function(require,module,exports){
+
+const mathgl = require('@math.gl/core');
+
+module.exports = {
+  vec3: (x, y, z) => (new mathgl.Vector3(x, y, z)),
+  vec2: (x, y) => (new mathgl.Vector2(x, y)),
+  ...mathgl
+}
+},{"@math.gl/core":32}],4:[function(require,module,exports){
 function _arrayLikeToArray(arr, len) {
   if (len == null || len > arr.length) len = arr.length;
 
@@ -28,13 +75,13 @@ function _arrayLikeToArray(arr, len) {
 }
 
 module.exports = _arrayLikeToArray, module.exports.__esModule = true, module.exports["default"] = module.exports;
-},{}],4:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 function _arrayWithHoles(arr) {
   if (Array.isArray(arr)) return arr;
 }
 
 module.exports = _arrayWithHoles, module.exports.__esModule = true, module.exports["default"] = module.exports;
-},{}],5:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 function _assertThisInitialized(self) {
   if (self === void 0) {
     throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
@@ -44,7 +91,7 @@ function _assertThisInitialized(self) {
 }
 
 module.exports = _assertThisInitialized, module.exports.__esModule = true, module.exports["default"] = module.exports;
-},{}],6:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 function _classCallCheck(instance, Constructor) {
   if (!(instance instanceof Constructor)) {
     throw new TypeError("Cannot call a class as a function");
@@ -52,7 +99,7 @@ function _classCallCheck(instance, Constructor) {
 }
 
 module.exports = _classCallCheck, module.exports.__esModule = true, module.exports["default"] = module.exports;
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 function _defineProperties(target, props) {
   for (var i = 0; i < props.length; i++) {
     var descriptor = props[i];
@@ -73,7 +120,7 @@ function _createClass(Constructor, protoProps, staticProps) {
 }
 
 module.exports = _createClass, module.exports.__esModule = true, module.exports["default"] = module.exports;
-},{}],8:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 function _defineProperty(obj, key, value) {
   if (key in obj) {
     Object.defineProperty(obj, key, {
@@ -90,7 +137,7 @@ function _defineProperty(obj, key, value) {
 }
 
 module.exports = _defineProperty, module.exports.__esModule = true, module.exports["default"] = module.exports;
-},{}],9:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 function _getPrototypeOf(o) {
   module.exports = _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function _getPrototypeOf(o) {
     return o.__proto__ || Object.getPrototypeOf(o);
@@ -99,7 +146,7 @@ function _getPrototypeOf(o) {
 }
 
 module.exports = _getPrototypeOf, module.exports.__esModule = true, module.exports["default"] = module.exports;
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 var setPrototypeOf = require("./setPrototypeOf.js");
 
 function _inherits(subClass, superClass) {
@@ -121,7 +168,7 @@ function _inherits(subClass, superClass) {
 }
 
 module.exports = _inherits, module.exports.__esModule = true, module.exports["default"] = module.exports;
-},{"./setPrototypeOf.js":15}],11:[function(require,module,exports){
+},{"./setPrototypeOf.js":16}],12:[function(require,module,exports){
 function _interopRequireDefault(obj) {
   return obj && obj.__esModule ? obj : {
     "default": obj
@@ -129,7 +176,7 @@ function _interopRequireDefault(obj) {
 }
 
 module.exports = _interopRequireDefault, module.exports.__esModule = true, module.exports["default"] = module.exports;
-},{}],12:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 function _iterableToArrayLimit(arr, i) {
   var _i = arr == null ? null : typeof Symbol !== "undefined" && arr[Symbol.iterator] || arr["@@iterator"];
 
@@ -161,13 +208,13 @@ function _iterableToArrayLimit(arr, i) {
 }
 
 module.exports = _iterableToArrayLimit, module.exports.__esModule = true, module.exports["default"] = module.exports;
-},{}],13:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 function _nonIterableRest() {
   throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
 }
 
 module.exports = _nonIterableRest, module.exports.__esModule = true, module.exports["default"] = module.exports;
-},{}],14:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 var _typeof = require("./typeof.js")["default"];
 
 var assertThisInitialized = require("./assertThisInitialized.js");
@@ -183,7 +230,7 @@ function _possibleConstructorReturn(self, call) {
 }
 
 module.exports = _possibleConstructorReturn, module.exports.__esModule = true, module.exports["default"] = module.exports;
-},{"./assertThisInitialized.js":5,"./typeof.js":17}],15:[function(require,module,exports){
+},{"./assertThisInitialized.js":6,"./typeof.js":18}],16:[function(require,module,exports){
 function _setPrototypeOf(o, p) {
   module.exports = _setPrototypeOf = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function _setPrototypeOf(o, p) {
     o.__proto__ = p;
@@ -193,7 +240,7 @@ function _setPrototypeOf(o, p) {
 }
 
 module.exports = _setPrototypeOf, module.exports.__esModule = true, module.exports["default"] = module.exports;
-},{}],16:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 var arrayWithHoles = require("./arrayWithHoles.js");
 
 var iterableToArrayLimit = require("./iterableToArrayLimit.js");
@@ -207,7 +254,7 @@ function _slicedToArray(arr, i) {
 }
 
 module.exports = _slicedToArray, module.exports.__esModule = true, module.exports["default"] = module.exports;
-},{"./arrayWithHoles.js":4,"./iterableToArrayLimit.js":12,"./nonIterableRest.js":13,"./unsupportedIterableToArray.js":18}],17:[function(require,module,exports){
+},{"./arrayWithHoles.js":5,"./iterableToArrayLimit.js":13,"./nonIterableRest.js":14,"./unsupportedIterableToArray.js":19}],18:[function(require,module,exports){
 function _typeof(obj) {
   "@babel/helpers - typeof";
 
@@ -219,7 +266,7 @@ function _typeof(obj) {
 }
 
 module.exports = _typeof, module.exports.__esModule = true, module.exports["default"] = module.exports;
-},{}],18:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 var arrayLikeToArray = require("./arrayLikeToArray.js");
 
 function _unsupportedIterableToArray(o, minLen) {
@@ -232,7 +279,7 @@ function _unsupportedIterableToArray(o, minLen) {
 }
 
 module.exports = _unsupportedIterableToArray, module.exports.__esModule = true, module.exports["default"] = module.exports;
-},{"./arrayLikeToArray.js":3}],19:[function(require,module,exports){
+},{"./arrayLikeToArray.js":4}],20:[function(require,module,exports){
 "use strict";
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
@@ -581,7 +628,7 @@ var MathArray = function (_extendableBuiltin2) {
 
 exports.default = MathArray;
 
-},{"../../lib/common":33,"@babel/runtime/helpers/classCallCheck":6,"@babel/runtime/helpers/createClass":7,"@babel/runtime/helpers/getPrototypeOf":9,"@babel/runtime/helpers/inherits":10,"@babel/runtime/helpers/interopRequireDefault":11,"@babel/runtime/helpers/possibleConstructorReturn":14}],20:[function(require,module,exports){
+},{"../../lib/common":34,"@babel/runtime/helpers/classCallCheck":7,"@babel/runtime/helpers/createClass":8,"@babel/runtime/helpers/getPrototypeOf":10,"@babel/runtime/helpers/inherits":11,"@babel/runtime/helpers/interopRequireDefault":12,"@babel/runtime/helpers/possibleConstructorReturn":15}],21:[function(require,module,exports){
 "use strict";
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
@@ -690,7 +737,7 @@ var Matrix = function (_MathArray) {
 
 exports.default = Matrix;
 
-},{"../../lib/common":33,"../../lib/validators":36,"./math-array":19,"@babel/runtime/helpers/classCallCheck":6,"@babel/runtime/helpers/createClass":7,"@babel/runtime/helpers/getPrototypeOf":9,"@babel/runtime/helpers/inherits":10,"@babel/runtime/helpers/interopRequireDefault":11,"@babel/runtime/helpers/possibleConstructorReturn":14}],21:[function(require,module,exports){
+},{"../../lib/common":34,"../../lib/validators":37,"./math-array":20,"@babel/runtime/helpers/classCallCheck":7,"@babel/runtime/helpers/createClass":8,"@babel/runtime/helpers/getPrototypeOf":10,"@babel/runtime/helpers/inherits":11,"@babel/runtime/helpers/interopRequireDefault":12,"@babel/runtime/helpers/possibleConstructorReturn":15}],22:[function(require,module,exports){
 "use strict";
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
@@ -901,7 +948,7 @@ var Vector = function (_MathArray) {
 
 exports.default = Vector;
 
-},{"../../lib/assert":32,"../../lib/validators":36,"./math-array":19,"@babel/runtime/helpers/classCallCheck":6,"@babel/runtime/helpers/createClass":7,"@babel/runtime/helpers/getPrototypeOf":9,"@babel/runtime/helpers/inherits":10,"@babel/runtime/helpers/interopRequireDefault":11,"@babel/runtime/helpers/possibleConstructorReturn":14}],22:[function(require,module,exports){
+},{"../../lib/assert":33,"../../lib/validators":37,"./math-array":20,"@babel/runtime/helpers/classCallCheck":7,"@babel/runtime/helpers/createClass":8,"@babel/runtime/helpers/getPrototypeOf":10,"@babel/runtime/helpers/inherits":11,"@babel/runtime/helpers/interopRequireDefault":12,"@babel/runtime/helpers/possibleConstructorReturn":15}],23:[function(require,module,exports){
 "use strict";
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
@@ -1556,7 +1603,7 @@ function checkOrder(value) {
   return value;
 }
 
-},{"../lib/common":33,"../lib/validators":36,"./base/math-array":19,"./quaternion":26,"@babel/runtime/helpers/classCallCheck":6,"@babel/runtime/helpers/createClass":7,"@babel/runtime/helpers/getPrototypeOf":9,"@babel/runtime/helpers/inherits":10,"@babel/runtime/helpers/interopRequireDefault":11,"@babel/runtime/helpers/possibleConstructorReturn":14,"@babel/runtime/helpers/slicedToArray":16}],23:[function(require,module,exports){
+},{"../lib/common":34,"../lib/validators":37,"./base/math-array":20,"./quaternion":27,"@babel/runtime/helpers/classCallCheck":7,"@babel/runtime/helpers/createClass":8,"@babel/runtime/helpers/getPrototypeOf":10,"@babel/runtime/helpers/inherits":11,"@babel/runtime/helpers/interopRequireDefault":12,"@babel/runtime/helpers/possibleConstructorReturn":15,"@babel/runtime/helpers/slicedToArray":17}],24:[function(require,module,exports){
 "use strict";
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
@@ -1841,7 +1888,7 @@ function getIdentityMatrix() {
   return IDENTITY_MATRIX3;
 }
 
-},{"../lib/gl-matrix-extras":34,"../lib/validators":36,"./base/matrix":20,"@babel/runtime/helpers/classCallCheck":6,"@babel/runtime/helpers/createClass":7,"@babel/runtime/helpers/getPrototypeOf":9,"@babel/runtime/helpers/inherits":10,"@babel/runtime/helpers/interopRequireDefault":11,"@babel/runtime/helpers/possibleConstructorReturn":14,"@babel/runtime/helpers/typeof":17,"gl-matrix/mat3":38,"gl-matrix/vec2":41,"gl-matrix/vec3":42}],24:[function(require,module,exports){
+},{"../lib/gl-matrix-extras":35,"../lib/validators":37,"./base/matrix":21,"@babel/runtime/helpers/classCallCheck":7,"@babel/runtime/helpers/createClass":8,"@babel/runtime/helpers/getPrototypeOf":10,"@babel/runtime/helpers/inherits":11,"@babel/runtime/helpers/interopRequireDefault":12,"@babel/runtime/helpers/possibleConstructorReturn":15,"@babel/runtime/helpers/typeof":18,"gl-matrix/mat3":39,"gl-matrix/vec2":42,"gl-matrix/vec3":43}],25:[function(require,module,exports){
 "use strict";
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
@@ -2416,7 +2463,7 @@ function computeInfinitePerspectiveOffCenter(result, left, right, bottom, top, n
   return result;
 }
 
-},{"../lib/gl-matrix-extras":34,"../lib/validators":36,"./base/matrix":20,"@babel/runtime/helpers/classCallCheck":6,"@babel/runtime/helpers/createClass":7,"@babel/runtime/helpers/getPrototypeOf":9,"@babel/runtime/helpers/inherits":10,"@babel/runtime/helpers/interopRequireDefault":11,"@babel/runtime/helpers/possibleConstructorReturn":14,"@babel/runtime/helpers/typeof":17,"gl-matrix/mat4":39,"gl-matrix/vec2":41,"gl-matrix/vec3":42,"gl-matrix/vec4":43}],25:[function(require,module,exports){
+},{"../lib/gl-matrix-extras":35,"../lib/validators":37,"./base/matrix":21,"@babel/runtime/helpers/classCallCheck":7,"@babel/runtime/helpers/createClass":8,"@babel/runtime/helpers/getPrototypeOf":10,"@babel/runtime/helpers/inherits":11,"@babel/runtime/helpers/interopRequireDefault":12,"@babel/runtime/helpers/possibleConstructorReturn":15,"@babel/runtime/helpers/typeof":18,"gl-matrix/mat4":40,"gl-matrix/vec2":42,"gl-matrix/vec3":43,"gl-matrix/vec4":44}],26:[function(require,module,exports){
 "use strict";
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
@@ -2576,7 +2623,7 @@ var Pose = function () {
 
 exports.default = Pose;
 
-},{"./euler":22,"./matrix4":24,"./vector3":29,"@babel/runtime/helpers/classCallCheck":6,"@babel/runtime/helpers/createClass":7,"@babel/runtime/helpers/defineProperty":8,"@babel/runtime/helpers/interopRequireDefault":11}],26:[function(require,module,exports){
+},{"./euler":23,"./matrix4":25,"./vector3":30,"@babel/runtime/helpers/classCallCheck":7,"@babel/runtime/helpers/createClass":8,"@babel/runtime/helpers/defineProperty":9,"@babel/runtime/helpers/interopRequireDefault":12}],27:[function(require,module,exports){
 "use strict";
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
@@ -2900,7 +2947,7 @@ var Quaternion = function (_MathArray) {
 
 exports.default = Quaternion;
 
-},{"../lib/validators":36,"./base/math-array":19,"./vector4":30,"@babel/runtime/helpers/classCallCheck":6,"@babel/runtime/helpers/createClass":7,"@babel/runtime/helpers/getPrototypeOf":9,"@babel/runtime/helpers/inherits":10,"@babel/runtime/helpers/interopRequireDefault":11,"@babel/runtime/helpers/possibleConstructorReturn":14,"@babel/runtime/helpers/typeof":17,"gl-matrix/quat":40,"gl-matrix/vec4":43}],27:[function(require,module,exports){
+},{"../lib/validators":37,"./base/math-array":20,"./vector4":31,"@babel/runtime/helpers/classCallCheck":7,"@babel/runtime/helpers/createClass":8,"@babel/runtime/helpers/getPrototypeOf":10,"@babel/runtime/helpers/inherits":11,"@babel/runtime/helpers/interopRequireDefault":12,"@babel/runtime/helpers/possibleConstructorReturn":15,"@babel/runtime/helpers/typeof":18,"gl-matrix/quat":41,"gl-matrix/vec4":44}],28:[function(require,module,exports){
 "use strict";
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
@@ -3109,7 +3156,7 @@ var SphericalCoordinates = function () {
 
 exports.default = SphericalCoordinates;
 
-},{"../lib/common":33,"./vector3":29,"@babel/runtime/helpers/classCallCheck":6,"@babel/runtime/helpers/createClass":7,"@babel/runtime/helpers/defineProperty":8,"@babel/runtime/helpers/interopRequireDefault":11,"@babel/runtime/helpers/slicedToArray":16,"@babel/runtime/helpers/typeof":17,"gl-matrix/vec3":42}],28:[function(require,module,exports){
+},{"../lib/common":34,"./vector3":30,"@babel/runtime/helpers/classCallCheck":7,"@babel/runtime/helpers/createClass":8,"@babel/runtime/helpers/defineProperty":9,"@babel/runtime/helpers/interopRequireDefault":12,"@babel/runtime/helpers/slicedToArray":17,"@babel/runtime/helpers/typeof":18,"gl-matrix/vec3":43}],29:[function(require,module,exports){
 "use strict";
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
@@ -3266,7 +3313,7 @@ var Vector2 = function (_Vector) {
 
 exports.default = Vector2;
 
-},{"../lib/common":33,"../lib/gl-matrix-extras":34,"../lib/validators":36,"./base/vector":21,"@babel/runtime/helpers/classCallCheck":6,"@babel/runtime/helpers/createClass":7,"@babel/runtime/helpers/getPrototypeOf":9,"@babel/runtime/helpers/inherits":10,"@babel/runtime/helpers/interopRequireDefault":11,"@babel/runtime/helpers/possibleConstructorReturn":14,"@babel/runtime/helpers/typeof":17,"gl-matrix/vec2":41}],29:[function(require,module,exports){
+},{"../lib/common":34,"../lib/gl-matrix-extras":35,"../lib/validators":37,"./base/vector":22,"@babel/runtime/helpers/classCallCheck":7,"@babel/runtime/helpers/createClass":8,"@babel/runtime/helpers/getPrototypeOf":10,"@babel/runtime/helpers/inherits":11,"@babel/runtime/helpers/interopRequireDefault":12,"@babel/runtime/helpers/possibleConstructorReturn":15,"@babel/runtime/helpers/typeof":18,"gl-matrix/vec2":42}],30:[function(require,module,exports){
 "use strict";
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
@@ -3480,7 +3527,7 @@ var Vector3 = function (_Vector) {
 
 exports.default = Vector3;
 
-},{"../lib/common":33,"../lib/gl-matrix-extras":34,"../lib/validators":36,"./base/vector":21,"@babel/runtime/helpers/classCallCheck":6,"@babel/runtime/helpers/createClass":7,"@babel/runtime/helpers/getPrototypeOf":9,"@babel/runtime/helpers/inherits":10,"@babel/runtime/helpers/interopRequireDefault":11,"@babel/runtime/helpers/possibleConstructorReturn":14,"@babel/runtime/helpers/typeof":17,"gl-matrix/vec3":42}],30:[function(require,module,exports){
+},{"../lib/common":34,"../lib/gl-matrix-extras":35,"../lib/validators":37,"./base/vector":22,"@babel/runtime/helpers/classCallCheck":7,"@babel/runtime/helpers/createClass":8,"@babel/runtime/helpers/getPrototypeOf":10,"@babel/runtime/helpers/inherits":11,"@babel/runtime/helpers/interopRequireDefault":12,"@babel/runtime/helpers/possibleConstructorReturn":15,"@babel/runtime/helpers/typeof":18,"gl-matrix/vec3":43}],31:[function(require,module,exports){
 "use strict";
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
@@ -3666,7 +3713,7 @@ var Vector4 = function (_Vector) {
 
 exports.default = Vector4;
 
-},{"../lib/common":33,"../lib/gl-matrix-extras":34,"../lib/validators":36,"./base/vector":21,"@babel/runtime/helpers/classCallCheck":6,"@babel/runtime/helpers/createClass":7,"@babel/runtime/helpers/getPrototypeOf":9,"@babel/runtime/helpers/inherits":10,"@babel/runtime/helpers/interopRequireDefault":11,"@babel/runtime/helpers/possibleConstructorReturn":14,"@babel/runtime/helpers/typeof":17,"gl-matrix/vec3":42}],31:[function(require,module,exports){
+},{"../lib/common":34,"../lib/gl-matrix-extras":35,"../lib/validators":37,"./base/vector":22,"@babel/runtime/helpers/classCallCheck":7,"@babel/runtime/helpers/createClass":8,"@babel/runtime/helpers/getPrototypeOf":10,"@babel/runtime/helpers/inherits":11,"@babel/runtime/helpers/interopRequireDefault":12,"@babel/runtime/helpers/possibleConstructorReturn":15,"@babel/runtime/helpers/typeof":18,"gl-matrix/vec3":43}],32:[function(require,module,exports){
 "use strict";
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
@@ -3903,7 +3950,7 @@ var _assert = _interopRequireDefault(require("./lib/assert"));
 
 var _common = require("./lib/common");
 
-},{"./classes/euler":22,"./classes/matrix3":23,"./classes/matrix4":24,"./classes/pose":25,"./classes/quaternion":26,"./classes/spherical-coordinates":27,"./classes/vector2":28,"./classes/vector3":29,"./classes/vector4":30,"./lib/assert":32,"./lib/common":33,"./lib/math-utils":35,"@babel/runtime/helpers/interopRequireDefault":11}],32:[function(require,module,exports){
+},{"./classes/euler":23,"./classes/matrix3":24,"./classes/matrix4":25,"./classes/pose":26,"./classes/quaternion":27,"./classes/spherical-coordinates":28,"./classes/vector2":29,"./classes/vector3":30,"./classes/vector4":31,"./lib/assert":33,"./lib/common":34,"./lib/math-utils":36,"@babel/runtime/helpers/interopRequireDefault":12}],33:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -3917,7 +3964,7 @@ function assert(condition, message) {
   }
 }
 
-},{}],33:[function(require,module,exports){
+},{}],34:[function(require,module,exports){
 "use strict";
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
@@ -4173,7 +4220,7 @@ function map(value, func, result) {
   return func(value);
 }
 
-},{"./assert":32,"@babel/runtime/helpers/interopRequireDefault":11,"@babel/runtime/helpers/typeof":17}],34:[function(require,module,exports){
+},{"./assert":33,"@babel/runtime/helpers/interopRequireDefault":12,"@babel/runtime/helpers/typeof":18}],35:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -4235,7 +4282,7 @@ function vec4_transformMat3(out, a, m) {
   return out;
 }
 
-},{}],35:[function(require,module,exports){
+},{}],36:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -4270,7 +4317,7 @@ var _default = {
 };
 exports.default = _default;
 
-},{}],36:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -4324,7 +4371,7 @@ function deprecated(method, version) {
   }
 }
 
-},{"./common":33}],37:[function(require,module,exports){
+},{"./common":34}],38:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -4392,7 +4439,7 @@ if (!Math.hypot) Math.hypot = function () {
 
   return Math.sqrt(y);
 };
-},{}],38:[function(require,module,exports){
+},{}],39:[function(require,module,exports){
 "use strict";
 
 function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
@@ -5246,7 +5293,7 @@ var mul = multiply;
 exports.mul = mul;
 var sub = subtract;
 exports.sub = sub;
-},{"./common.js":37}],39:[function(require,module,exports){
+},{"./common.js":38}],40:[function(require,module,exports){
 "use strict";
 
 function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
@@ -7270,7 +7317,7 @@ var mul = multiply;
 exports.mul = mul;
 var sub = subtract;
 exports.sub = sub;
-},{"./common.js":37}],40:[function(require,module,exports){
+},{"./common.js":38}],41:[function(require,module,exports){
 "use strict";
 
 function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
@@ -8062,7 +8109,7 @@ var setAxes = function () {
 }();
 
 exports.setAxes = setAxes;
-},{"./common.js":37,"./mat3.js":38,"./vec3.js":42,"./vec4.js":43}],41:[function(require,module,exports){
+},{"./common.js":38,"./mat3.js":39,"./vec3.js":43,"./vec4.js":44}],42:[function(require,module,exports){
 "use strict";
 
 function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
@@ -8784,7 +8831,7 @@ var forEach = function () {
 }();
 
 exports.forEach = forEach;
-},{"./common.js":37}],42:[function(require,module,exports){
+},{"./common.js":38}],43:[function(require,module,exports){
 "use strict";
 
 function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
@@ -9675,7 +9722,7 @@ var forEach = function () {
 }();
 
 exports.forEach = forEach;
-},{"./common.js":37}],43:[function(require,module,exports){
+},{"./common.js":38}],44:[function(require,module,exports){
 "use strict";
 
 function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
@@ -10428,4 +10475,4 @@ var forEach = function () {
 }();
 
 exports.forEach = forEach;
-},{"./common.js":37}]},{},[1]);
+},{"./common.js":38}]},{},[2]);

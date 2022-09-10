@@ -6,7 +6,7 @@
   "scripts": {
     "install": "cd public && npm i && cd ../server && npm i",
     "build": "cd public && npm run build",
-    "server": "concurrently \"cd public && npm run watch\"  \"cd server && npm run watch\"",
+    "server": "concurrently \"cd public && npm run watch\" \"cd server && npm run watch\"",
     "dev": "npm run build && npm run server",
     "start": "cd server && npm run start"
   },
