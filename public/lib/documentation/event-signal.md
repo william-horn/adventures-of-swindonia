@@ -47,10 +47,10 @@ const event = EventMaker.event();
 ```
 
 The `event` constructor takes two arguments; both are optional. Arguments listed in order:
-- `parentEvent` &lt;Event Instance>
+- `parentEvent` **&lt;Event Instance>**
   * Another event instance which will now contain the new instantiated event inside the `childEvents` field. Behavior affecting the parent event can ripple down to child and descendant events.
 
-* `settings` &lt;Object>
+* `settings` **&lt;Object>**
   - The settings object contains all additional config data about the event and how it will behave. For now, there is only one field in the settings object that is configurable which is the `cooldown` property.
 
 
@@ -84,14 +84,14 @@ When an event is fired, only the connections made to that event will dispatch. T
 
 Events are only useful if they have connections. You can create a new event connection by calling the `connect` method on the event instance. 
 
-The `connect` method takes two arguments; one is optional. Arguments listed in order:
+The `connect` method takes up to two arguments; one is optional. Arguments listed in order:
 
 > *Optional arguments are denoted with the '?' symbol next to their name*
 
-* `connectionName`? &lt;String>
+* `connectionName`? **&lt;string>**
   - Only needed if you intend on disconnecting or filtering events by name later on. If no name is given, the event connection is considered anonymous.
 
-- `handlerFunction` &lt;function>
+- `handlerFunction` **&lt;function>**
   * The handler function that executes when the event is dispatched.
 
 Below are some examples of creating event connections using a variation of arguments:
@@ -110,6 +110,7 @@ event.connect( eventHandler );
 event.connect( 'someHandler', eventHandler );
 ```
 
+Events have no limit to how many connections they can have. All connections will be dispatched when the dispatcher methods are called.
 
 ## Dispatching Events
 
@@ -153,20 +154,69 @@ event.fire('hello', 'there', 'world!');
 ```
 ##
     => hello there world!
+
+As mentioned before, you can create as many connections to an event instance as you like. They will all be fired once the dispatcher is called.
+
+Example:
+
+```js
+const event = EventMaker.event();
+
+event.connect( () => console.log('event connection #1') );
+event.connect( () => console.log('event connection #2') );
+event.connect( () => console.log('event connection #3') );
+
+event.fire();
+```
+##
+    => event connection #1
+    => event connection #2
+    => event connection #3
+
+## Disconnecting Events
+
+If you no longer need an event connection then you may disconnect it from the event instance by using the `disconnect` or `disconnectAll` methods. You can disconnect event connections by name, handler function, or by connection instance returned from the `connect` method.
+
+The `disconnect` method takes up to three arguments; two of them are optional. Arguments listed in order:
+
+
+* `connectionName`? **&lt;string>**
+  - The name of the connection to disconnect
+
+- `handlerFunction`? **&lt;function>**
+  * The handler function literal that was passed to a `connect` method
+
+* `connectionInstance` **&lt;Connection Object>**
+  - The connection object returned from the `connect` method
+
+```js
+const event = EventMaker.event();
+
+// create event handlers
+const anonymousHandler = () => console.log('anonymous handler fired!');
+const namedHandler = () => console.log('named handler fired!');
+const functionRefHandler = () => console.log('function ref handler fired!');
+
+// connect handlers to event
+event.connect( anonymousHandler );
+event.connect( 'namedHandler', namedHandler );
+event.connect( functionRefHandler );
+```
+
 ## Waiting for Event Signals
 The code below demonstrates how we can "pause" code execution using `event.wait()` until the event is fired with `event.fire()`. The waiting is promise-based, therefore all tasks waiting for an event to be fired should be done within an async function.
 ```js
 const event = EventSignal.event();
 event.connect(() => console.log('event fired!'));
 
-const eventWaiter = async () => {
+const oneSecondEventIntervals = async () => {
   while (true) {
     const yieldResult = await event.wait();
     const dateTime = yieldResult[0]; // 1662869075619
   }
 }
 
-eventWaiter();
+oneSecondEventIntervals();
 setInterval(() => event.fire(Date.now()), 1000);
 ```
 
