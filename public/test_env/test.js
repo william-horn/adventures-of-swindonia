@@ -1,15 +1,13 @@
 
-// const EventSignal = require('../lib/event-signal');
-// const event = EventSignal.event();
+const EventMaker = require('../lib/event-maker');
+const event = EventMaker.event();
 
-// event.test();
 
-const { EventSignal } = require('../lib/event-signal');
 
-const event = EventSignal.event()
-;
-const f = () => {}
-event.connect(f, 'lol');
-
-console.log(event);
+// const { 
+//   event,
+//   sequenceEvent,
+//   toggleEvent
+// } = require('EventMaker');
+// const EventMaker = require('EventMaker');
 

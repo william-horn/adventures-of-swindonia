@@ -240,6 +240,32 @@ Disconnect by name and by function handler
 event.disconnect( 'testFilter', testFilterHandler );
 ```
 
+If we now try to fire the event:
+```js
+event.fire();
+```
+##
+    => anonymous handler fired!
+
+All connections except for the *anonymous handler* were disconnected, so that is the only handler that ran during the dispatch.
+
+The `disconnectAll` method will disconnect all connections directly associated with an event instance. It will not disconnect event connections bound to child or descendant events.
+
+This method takes no arguments.
+
+```js
+const event = EventMaker.event();
+
+event.connect( () => console.log('event connection #1') );
+event.connect( () => console.log('event connection #2') );
+event.connect( () => console.log('event connection #3') );
+
+event.disconnectAll();
+event.fire();
+```
+##
+    =>
+
 ## Waiting for Event Signals
 The code below demonstrates how we can "pause" code execution using `event.wait()` until the event is fired with `event.fire()`. The waiting is promise-based, therefore all tasks waiting for an event to be fired should be done within an async function.
 ```js
@@ -327,3 +353,10 @@ KeyboardEvent.fireAll()
     => keyboard changed!
     => A was pressed!
     => B was pressed!
+
+
+## testing
+```js
+
+
+```
