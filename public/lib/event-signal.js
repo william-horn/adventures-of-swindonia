@@ -1,20 +1,37 @@
 
+/*
+  Import helper functions
+*/
 const {
   modelArgs
 } = require('../../lib/helpers');
 
+
 const EventSignal = {};
 
+
+/*
+  Declare method functions
+*/
 const connectSignal = function(name, func) {
-  console.log(name, func);
   [name, func] = modelArgs([
     [name, 'string'],
     [func, 'function', {string: name}]
   ]);
 
-  console.log(name, func);
+  const connection = {
+    handler: func,
+    name: name,
+  }
+
+  this.connections.push(connection);
+  return connection;
 }
 
+
+/*
+  Declare constructor functions
+*/
 const eventConstructor = (parentEvent, settings) => {
   const event = {
     // event fields
@@ -45,5 +62,6 @@ const eventConstructor = (parentEvent, settings) => {
   return event;
 }
 
-EventSignal.event = eventConstructor
-module.exports = { EventSignal };
+module.exports = {
+  event: eventConstructor,
+}
