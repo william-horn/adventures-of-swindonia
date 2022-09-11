@@ -117,3 +117,4 @@ const eventConstructor = (parentEvent, settings) => {
 module.exports = {
   event: eventConstructor,
 }
+

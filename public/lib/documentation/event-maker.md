@@ -143,8 +143,6 @@ You may also pass any number of arguments to the dispatcher methods. This means 
 
 Example:
 ```js
-const event = EventMaker.event();
-
 event.connect( 
   (a, b, c) => console.log('event fired with args: ', a, b, c) 
 );
@@ -160,8 +158,6 @@ As mentioned before, you can create as many connections to an event instance as 
 Example:
 
 ```js
-const event = EventMaker.event();
-
 event.connect( () => console.log('event connection #1') );
 event.connect( () => console.log('event connection #2') );
 event.connect( () => console.log('event connection #3') );
@@ -193,6 +189,7 @@ The `disconnect` method takes up to three arguments; all of them are optional. A
 If no arguments are passed to `disconnect`, then **all** connections will be disconnected from the event instance.
 ```js
 const event = EventMaker.event();
+
 event.connect( () => console.log('connection #1 fired!') );
 event.connect( () => console.log('connection #2 fired!') );
 
@@ -205,8 +202,6 @@ event.fire();
 If you pass the `connectionInstance` as an argument, then the other two argument are not necessary. This is because connection instances have a one-to-one relationship with event connections; meaning there will only ever be one event connection associated with a connection instance.
 
 ```js
-const event = EventMaker.event();
-
 event.connect( () => console.log('connection #1 fired!') );
 const conn = event.connect( () => console.log('connection #2 fired!') );
 
@@ -220,8 +215,6 @@ If you pass the `connectionName` or `handlerFunction` arguments then you may pas
 
 Setup:
 ```js
-const event = EventMaker.event();
-
 const handler1 = () => console.log('event handler #1 fired!');
 const handler2 = () => console.log('event handler #2 fired!');
 
@@ -266,24 +259,47 @@ event.fire();
     =>  <Empty>
 
 
-All connections except for the *anonymous handler* were disconnected, so that is the only handler that ran during the dispatch.
+All connections were disconnected individually and so now the output is empty.
 
-The `disconnectAll` method will disconnect all connections directly associated with an event instance. It will not disconnect event connections bound to child or descendant events.
+The `disconnectAll` method (similar to the internal behavior of `fireAll`) will recursively call `disconnect` on all descendant events.
 
-This method takes no arguments.
+This method takes the same arguments as `disconnect`. If no arguments are passed to `disconnectAll`, then **all** connections attached to the event instance and all of it's descendant events will be disconnected.
 
+Here is a demonstration:
 ```js
-const event = EventMaker.event();
+const parentEvent = EventMaker.event();
+const childEvent = EventMaker.event(parentEvent);
 
-event.connect( () => console.log('event connection #1') );
-event.connect( () => console.log('event connection #2') );
-event.connect( () => console.log('event connection #3') );
+parentEvent.connect( () => console.log('parent event #1') );
+childEvent.connect( () => console.log('child event #1') );
 
-event.disconnectAll();
-event.fire();
+parentEvent.disconnectAll();
+
+parentEvent.fire();
+childEvent.fire();
 ```
 ##
-    =>
+    =>  <Empty>
+
+Since `disconnectAll` calls `disconnect` recursively, the same argument filtering will be applied to all descendant event instances if any arguments are provided.
+
+Here is a demonstration:
+```js
+const parentEvent = EventMaker.event();
+const childEvent = EventMaker.event(parentEvent);
+
+parentEvent.connect( () => console.log('parent event #1') );
+childEvent.connect( 'someName', () => console.log('child event #1') );
+childEvent.connect( () => console.log('child event #2') );
+
+parentEvent.disconnectAll('someName');
+
+// we can also use fireAll() here instead of firing the individual event hierarchy ranks
+parentEvent.fireAll();
+```
+##
+    =>  parent event #1
+        child event #2
 
 ## Waiting for Event Signals
 The code below demonstrates how we can "pause" code execution using `event.wait()` until the event is fired with `event.fire()`. The waiting is promise-based, therefore all tasks waiting for an event to be fired should be done within an async function.
