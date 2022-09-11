@@ -7,7 +7,7 @@
     "lib": "lib"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "nodemon test_env/test",
     "build": "browserify game.js -o dist/game-bundle.js",
     "watch": "watchify game.js -o dist/game-bundle.js"
   },
