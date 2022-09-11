@@ -175,7 +175,7 @@ event.fire();
 
 ## Disconnecting Events
 
-If you no longer need an event connection then you may disconnect it from the event instance by using the `disconnect` or `disconnectAll` methods. You can disconnect event connections by name, handler function, or by connection instance returned from the `connect` method.
+If you no longer need an event connection then you may disconnect it from the event instance by using the `disconnect` or `disconnectAll` methods. You can disconnect event connections by name, handler function, or by the connection instance returned from the `connect` method.
 
 The `disconnect` method takes up to three arguments; two of them are optional. Arguments listed in order:
 
@@ -186,9 +186,10 @@ The `disconnect` method takes up to three arguments; two of them are optional. A
 - `handlerFunction`? **&lt;function>**
   * The handler function literal that was passed to a `connect` method
 
-* `connectionInstance` **&lt;Connection Object>**
+* `connectionInstance`? **&lt;Connection Object>**
   - The connection object returned from the `connect` method
 
+At least one of these arguments are required when using the `disconnect` method. Here is an example using the disconnect argument filters below:
 ```js
 const event = EventMaker.event();
 
@@ -196,11 +197,47 @@ const event = EventMaker.event();
 const anonymousHandler = () => console.log('anonymous handler fired!');
 const namedHandler = () => console.log('named handler fired!');
 const functionRefHandler = () => console.log('function ref handler fired!');
+const instanceHandler = () => console.log('event instance handler fired!');
+const testFilterHandler = () => console.log('event filter handler fired!');
 
 // connect handlers to event
 event.connect( anonymousHandler );
 event.connect( 'namedHandler', namedHandler );
 event.connect( functionRefHandler );
+event.connect( 'testFilter', testFilterHandler );
+
+const connectionInstance = event.connect( instanceHandler );
+
+// dispatch all event connections
+event.fire();
+```
+##
+    => anonymous handler fired!
+    => named handler fired!
+    => function ref handler fired!
+    => event instance handler fired!
+    => event filter handler fired!
+
+Now after disconnecting all connections individually using different arguments for filtering:
+
+Disconnect by handler function
+```js
+event.disconnect( functionRefHandler );
+```
+
+Disconnect by name
+```js
+event.disconnect( 'namedHandler' );
+```
+
+Disconnect by connection instance
+```js
+event.disconnect( connectionInstance );
+```
+
+Disconnect by name and by function handler
+```js
+event.disconnect( 'testFilter', testFilterHandler );
 ```
 
 ## Waiting for Event Signals
