@@ -137,7 +137,7 @@ event.connect( () => console.log('event fired!') );
 event.fire();
 ```
 ##
-    => event fired!
+    =>  event fired!
 
 You may also pass any number of arguments to the dispatcher methods. This means you can include parameters to your event handler functions if you would like to receive some data from your dispatcher. 
 
@@ -153,7 +153,7 @@ event.connect(
 event.fire('hello', 'there', 'world!');
 ```
 ##
-    => hello there world!
+    =>  hello there world!
 
 As mentioned before, you can create as many connections to an event instance as you like. They will all be fired once the dispatcher is called.
 
@@ -169,15 +169,15 @@ event.connect( () => console.log('event connection #3') );
 event.fire();
 ```
 ##
-    => event connection #1
-    => event connection #2
-    => event connection #3
+    =>  event connection #1
+        event connection #2
+        event connection #3
 
 ## Disconnecting Events
 
 If you no longer need an event connection then you may disconnect it from the event instance by using the `disconnect` or `disconnectAll` methods. You can disconnect event connections by name, handler function, or by the connection instance returned from the `connect` method.
 
-The `disconnect` method takes up to three arguments; two of them are optional. Arguments listed in order:
+The `disconnect` method takes up to three arguments; all of them are optional. Arguments listed:
 
 
 * `connectionName`? **&lt;string>**
@@ -189,63 +189,82 @@ The `disconnect` method takes up to three arguments; two of them are optional. A
 * `connectionInstance`? **&lt;Connection Object>**
   - The connection object returned from the `connect` method
 
-At least one of these arguments are required when using the `disconnect` method. Here is an example using the disconnect argument filters below:
+
+If no arguments are passed to `disconnect`, then **all** connections will be disconnected from the event instance.
+```js
+const event = EventMaker.event();
+event.connect( () => console.log('connection #1 fired!') );
+event.connect( () => console.log('connection #2 fired!') );
+
+event.disconnect(); // disconnect all connections
+event.fire();
+```
+##
+    =>  <Empty>
+
+If you pass the `connectionInstance` as an argument, then the other two argument are not necessary. This is because connection instances have a one-to-one relationship with event connections; meaning there will only ever be one event connection associated with a connection instance.
+
 ```js
 const event = EventMaker.event();
 
-// create event handlers
-const anonymousHandler = () => console.log('anonymous handler fired!');
-const namedHandler = () => console.log('named handler fired!');
-const functionRefHandler = () => console.log('function ref handler fired!');
-const instanceHandler = () => console.log('event instance handler fired!');
-const testFilterHandler = () => console.log('event filter handler fired!');
+event.connect( () => console.log('connection #1 fired!') );
+const conn = event.connect( () => console.log('connection #2 fired!') );
 
-// connect handlers to event
-event.connect( anonymousHandler );
-event.connect( 'namedHandler', namedHandler );
-event.connect( functionRefHandler );
-event.connect( 'testFilter', testFilterHandler );
-
-const connectionInstance = event.connect( instanceHandler );
-
-// dispatch all event connections
+event.disconnect(conn); // disconnect using connection instance
 event.fire();
 ```
 ##
-    => anonymous handler fired!
-    => named handler fired!
-    => function ref handler fired!
-    => event instance handler fired!
-    => event filter handler fired!
+    =>  connection #1 fired!
 
-Now after disconnecting all connections individually using different arguments for filtering:
+If you pass the `connectionName` or `handlerFunction` arguments then you may pass them individually, at the same time, and in any order.
 
-Disconnect by handler function
+Setup:
 ```js
-event.disconnect( functionRefHandler );
-```
+const event = EventMaker.event();
 
-Disconnect by name
-```js
-event.disconnect( 'namedHandler' );
-```
+const handler1 = () => console.log('event handler #1 fired!');
+const handler2 = () => console.log('event handler #2 fired!');
 
-Disconnect by connection instance
-```js
-event.disconnect( connectionInstance );
-```
+event.connect( handler1 );
+event.connect( handler1 );
+event.connect( 'someName', handler1 );
+event.connect( 'anotherName', handler2 );
 
-Disconnect by name and by function handler
-```js
-event.disconnect( 'testFilter', testFilterHandler );
-```
-
-If we now try to fire the event:
-```js
 event.fire();
 ```
 ##
-    => anonymous handler fired!
+    =>  event handler #1 fired!
+        event handler #1 fired!
+        event handler #1 fired!
+        event handler #2 fired!
+
+### Disconnecting with `connectionName` and `handlerFunction`
+
+```js
+event.disconnect( 'someName', handler1 );
+event.fire();
+```
+##
+    =>  event handler #1 fired!
+        event handler #1 fired!
+        event handler #2 fired!
+
+### Disconnecting with `handlerFunction`
+```js
+event.disconnect( handler1 );
+event.fire();
+```
+##
+    =>  event handler #2 fired!
+
+### Disconnecting with `connectionName` and `handlerFunction` in reverse order:
+```js
+event.disconnect( handler2, 'anotherName' );
+event.fire();
+```
+##
+    =>  <Empty>
+
 
 All connections except for the *anonymous handler* were disconnected, so that is the only handler that ran during the dispatch.
 

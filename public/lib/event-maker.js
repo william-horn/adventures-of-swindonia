@@ -42,7 +42,6 @@ const fireSignal = function(...args) {
 }
 
 
-
 const disconnectSignal = function(connectionName, handlerFunction) {
   const connections = this.connections;
   let connectionInstance;
@@ -53,6 +52,7 @@ const disconnectSignal = function(connectionName, handlerFunction) {
     [connectionInstance, 'object']
   ]);
 
+  // special case: if connection object is passed instead of a name or handler function
   if (connectionInstance) {
     connections.splice(
       connections.findIndex(conn => conn === connectionInstance),
@@ -62,7 +62,8 @@ const disconnectSignal = function(connectionName, handlerFunction) {
     return;
   }
 
-  for (let i = 0; i < connections.length; i++) {
+  // disconnect based on connection name or handler function criteria
+  for (let i = connections.length - 1; i >= 0; i--) {
     const connection = connections[i];
 
     if (objectMeetsCriteria(connection, [
@@ -70,11 +71,12 @@ const disconnectSignal = function(connectionName, handlerFunction) {
       {key: 'handler', equals: handlerFunction, ignoreUndefined: true},
     ])) {
       connections.splice(i, 1);
-
     }
   }
 
 }
+
+
 
 /*
   Declare constructor functions
