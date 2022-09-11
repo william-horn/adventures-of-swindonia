@@ -1,50 +1,21 @@
 
+const {
+  modelArgs
+} = require('../../lib/helpers');
 
 const EventSignal = {};
 
-
-const modelArgs = (args, model) => {
-  const orderedArgs = [];
-  const typeHistory = {};
-
-  for (let argName in args) {
-    const argValue = args[argName];
-    const argType = typeof argValue;
-
-    const argTypeIndex = typeHistory[argType] || 0;
-    
-    for (let j = argTypeIndex; j < model.length; j++) {
-      if (model[j][argName] === argType) {
-
-      }
-    }
-
-
-  }
-
-  return orderedArgs;
-}
-
 const connectSignal = function(name, func) {
-  // [name, func] = [
-  //   func ? name : undefined,
-  //   func ? func : name
-  // ]
-
+  console.log(name, func);
   [name, func] = modelArgs([
     [name, 'string'],
     [func, 'function', {string: name}]
   ]);
 
+  console.log(name, func);
 }
 
-const defaultEventOptions = {
-  cooldown: 0,
-  timesFired: 0,
-  timesFiredWhilePaused: 0,
-}
-
-const eventConstructor = (parentEvent, options) => {
+const eventConstructor = (parentEvent, settings) => {
   const event = {
     // event fields
     className: 'EventSignal',
@@ -54,13 +25,18 @@ const eventConstructor = (parentEvent, options) => {
 
     parentEvent: parentEvent,
 
-    options: {
-      ...options,
-      ...defaultEventOptions
+    stats: {
+      timesFired: 0,
+      timesFiredWhilePaused: 0,
+    },
+
+    settings: {
+      cooldown: 0,
+      ...settings
     },
 
     // event methods
-    fire: fireConnections
+    connect: connectSignal
   }
 
   // add the new event instance to the parent event's child-event list
@@ -70,4 +46,4 @@ const eventConstructor = (parentEvent, options) => {
 }
 
 EventSignal.event = eventConstructor
-module.exports = EventSignal;
+module.exports = { EventSignal };
