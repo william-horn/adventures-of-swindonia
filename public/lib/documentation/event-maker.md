@@ -403,11 +403,13 @@ KeyboardEvent.fireAll()
 ## testing
 ```js
 const parentEvent = event()
-const childEvent = event(parentEvent)
+const childEvent = event(parentEvent, {
+  linked: [parentEvent],
+  bubbling: true
+})
 
-// going with this
-const childEvent = event()
-const parentEvent = event([childEvent])
-const newEvent = event({ settings })
-const anotherEvent = event([childEvent], { settings })
+
+
+
+
 ```
