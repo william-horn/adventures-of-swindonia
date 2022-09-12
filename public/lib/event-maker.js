@@ -10,6 +10,18 @@ const {
 
 const EventSignal = {};
 
+const recurse = (list, method, ...args) => {
+  for (let i = 0; i < list.length; i++) {
+    list[i][method](...args);
+  }
+}
+
+const dispatchConnections = (connections, ...args) => {
+  for (let i = 0; i < connections.length; i++) {
+    const connection = connections[i];
+    connection.handler(...args);
+  }
+}
 
 /*
   Declare method functions
@@ -31,16 +43,22 @@ const connectSignal = function(name, func) {
 
 
 const fireSignal = function(...args) {
+  const { 
+    settings, 
+    connections
+  } = this;
 
-  const connections = this.connections;
+  dispatchConnections(connections, ...args);
 
-  for (let i = 0; i < connections.length; i++) {
-    const connection = connections[i];
-    connection.handler(...args);
+  if (settings.linked) {
+
   }
-
 }
 
+const fireAllSignal = function(...args) {
+  dispatchConnections(this.connections, ...args);
+  recurse(this.childEvents, 'fireAll', ...args);
+}
 
 const disconnectSignal = function(connectionName, handlerFunction) {
   const connections = this.connections;
@@ -62,26 +80,41 @@ const disconnectSignal = function(connectionName, handlerFunction) {
     return;
   }
 
+  const isEligibleForDisconnect = connection => {
+    return objectMeetsCriteria(connection, [
+      {key: 'name', equals: connectionName, ignoreUndefined: true},
+      {key: 'handler', equals: handlerFunction, ignoreUndefined: true},
+    ]); 
+  }
+
   // disconnect based on connection name or handler function criteria
   for (let i = connections.length - 1; i >= 0; i--) {
     const connection = connections[i];
 
-    if (objectMeetsCriteria(connection, [
-      {key: 'name', equals: connectionName, ignoreUndefined: true},
-      {key: 'handler', equals: handlerFunction, ignoreUndefined: true},
-    ])) {
+    if (arguments.length === 0 || isEligibleForDisconnect(connection)) {
       connections.splice(i, 1);
     }
   }
 
 }
 
+const disconnectAllSignal = function(...args) {
+  this.disconnect(...args);
+  recurse(this.childEvents, 'disconnectAll', ...args);
+}
 
 
 /*
   Declare constructor functions
 */
-const eventConstructor = (parentEvent, settings) => {
+const eventConstructor = (childEvents, settings) => {
+
+  // [childEvents, settings] = modelArgs([
+  //   [childEvents, 'array', {object: settings}],
+  //   [settings, 'object']
+  // ]);
+
+
   const event = {
     // event fields
     className: 'EventSignal',
@@ -97,15 +130,23 @@ const eventConstructor = (parentEvent, settings) => {
     },
 
     settings: {
-      cooldown: 0,
+      // determines delay between event firing for every interval number of times
+      cooldown: {interval: 1, duration: 0},
+
+      // determines number of times event can be fired before it is disabled
       fireLimit: -1,
+
+      // determines if parent event will fire when child fires
+      linked: false,
       ...settings
     },
 
     // event methods
     connect: connectSignal,
     fire: fireSignal,
+    fireAll: fireAllSignal,
     disconnect: disconnectSignal,
+    disconnectAll: disconnectAllSignal,
   }
 
   // add the new event instance to the parent event's child-event list

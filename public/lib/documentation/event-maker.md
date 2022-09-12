@@ -78,7 +78,7 @@ Internally, the hierarchy looks something like this:
       }
     }
   
-When an event is fired, only the connections made to that event will dispatch. The signal will not trickle down to child events unless it is dispatched using `fireAll`.
+When an event is fired, only the connections made to that event will dispatch. The signal will not trickle down to descendant event instances unless it is dispatched using `fireAll`.
 
 ## Connecting Events
 
@@ -114,18 +114,18 @@ Events have no limit to how many connections they can have. All connections will
 
 ## Dispatching Events
 
-In the `EventMaker` library, events are dispatched by using the `fire` and `fireAll` methods. The difference between the two are highlighted below:
+Events are dispatched by using the `fire` and `fireAll` methods. The difference between the two are highlighted below:
 
 * `fire(...args)`
-  - Dispatch all event connections established on that event. Does **NOT** trickle downward to child events (if any exist).
+  - Dispatch all event connections established on that event. Does **NOT** trickle downward to descendant events.
 
 - `fireAll(...args)`
-  * Dispatch all event connections established on that event **INCLUDING** all connections established on all children and descendant events.
+  * Dispatch all event connections established on that event **INCLUDING** all connections established on all descendant events.
 
 
 For now we will just focus on the `fire` method, as this is the core function behind dispatching events. 
 
-> *Behind the scenes, `fireAll` is just a recursive call to `fire` for all child events*
+> *Behind the scenes, `fireAll` is just a recursive call to `fire` for all descendant events*
 ```js
 // create event instance
 const event = EventMaker.event();
@@ -139,7 +139,7 @@ event.fire();
 ##
     =>  event fired!
 
-You may also pass any number of arguments to the dispatcher methods. This means you can include parameters to your event handler functions if you would like to receive some data from your dispatcher. 
+You may also pass any number of arguments to the dispatcher methods. This means you can include parameters in your event handler functions if you would like to receive some data from your dispatcher. 
 
 Example:
 ```js
@@ -256,10 +256,10 @@ event.disconnect( handler2, 'anotherName' );
 event.fire();
 ```
 ##
-    =>  <Empty>
+    =>  event handler #1 fired!
+        event handler #1 fired!
+        event handler #1 fired!
 
-
-All connections were disconnected individually and so now the output is empty.
 
 The `disconnectAll` method (similar to the internal behavior of `fireAll`) will recursively call `disconnect` on all descendant events.
 
@@ -294,12 +294,22 @@ childEvent.connect( () => console.log('child event #2') );
 
 parentEvent.disconnectAll('someName');
 
-// we can also use fireAll() here instead of firing the individual event hierarchy ranks
+// we can use fireAll() instead of individually firing the events
 parentEvent.fireAll();
 ```
 ##
     =>  parent event #1
         child event #2
+
+> *Since we created a hierarchy with `childEvent` and `parentEvent`, doing:*
+```js
+parentEvent.fireAll();
+```
+> *is the same as:*
+```js
+parentEvent.fire();
+childEvent.fire();
+```
 
 ## Waiting for Event Signals
 The code below demonstrates how we can "pause" code execution using `event.wait()` until the event is fired with `event.fire()`. The waiting is promise-based, therefore all tasks waiting for an event to be fired should be done within an async function.
@@ -392,6 +402,12 @@ KeyboardEvent.fireAll()
 
 ## testing
 ```js
+const parentEvent = event()
+const childEvent = event(parentEvent)
 
-
+// going with this
+const childEvent = event()
+const parentEvent = event([childEvent])
+const newEvent = event({ settings })
+const anotherEvent = event([childEvent], { settings })
 ```
