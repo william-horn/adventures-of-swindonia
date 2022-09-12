@@ -122,15 +122,34 @@ const stopPropagating = function() {
 const dispatchEvent = function(payload, ...args) {
   const { event, caller, signature = {} } = payload;
 
-  const linkedEvents = event.settings.link;
-  const _connections = event._connections;
+  const { 
+    linkedEvents,
+    cooldown,
+    dispatchLimit
+  } = event.settings;
 
-  caller._propagating = true;
+  const {
+    timeLastDispatched,
+    dispatchCount,
+  } = event.stats
+
+  const {
+    _connections,
+  } = event;
 
   const _signature = {
     ...caller.settings,
     ...signature
   }
+
+  // todo: when event state is implemented add a guard clause here when limit is reached
+  if (dispatchLimit && dispatchCount >= dispatchLimit) {
+    console.log('dispatch limit reached');
+    return event.disconnect();
+  }
+
+  event.stats.dispatchCount++;
+  caller._propagating = true;
 
   for (let i = 0; i < _connections.length; i++) {
     const connection = _connections[i];
@@ -144,6 +163,7 @@ const dispatchEvent = function(payload, ...args) {
         event: linkedEvent,
         caller: caller,
         signature: { 
+          // continuePropagation: doesn't set _propagating to false after linked events fire
           continuePropagation: true,
           bubbling: linkedEvent.settings.bubbling
         }
@@ -157,9 +177,8 @@ const dispatchEvent = function(payload, ...args) {
       event: event._parentEvent,
       signature: _signature,
     }, ...args);
-  }
 
-  if (!_signature.continuePropagation) {
+  } else if (!_signature.continuePropagation) {
     caller._propagating = false;
   }
 }
@@ -237,7 +256,10 @@ const disconnectSignal = function(connectionName, handlerFunction) {
     { rule: [connectionInstance, 'object'] }
   ]);
 
-  // special case: if connection object is passed instead of a name or handler function
+  /*
+    special case: if connection object is passed instead of a name or handler function
+    then disconnect the connection instance
+  */
   if (connectionInstance) {
     _connections.splice(
       _connections.findIndex(conn => conn === connectionInstance),
@@ -264,9 +286,81 @@ const disconnectSignal = function(connectionName, handlerFunction) {
   }
 }
 
+/*
+  event.disconnectAll(...args)
+
+  The interface method for disconnecting event connections
+  and descendant event connections based on filter arguments
+
+  @params (same as event.disconnect)
+
+  @returns <void>
+*/
 const disconnectAllSignal = function(...args) {
   this.disconnect(...args);
   recurse(this._childEvents, 'disconnectAll', ...args);
+}
+
+
+/*
+  event.connectWithPriority(1, 'name', handler)
+
+  priorityEnums {
+    weak: 0
+    strong: 1,
+    factory: 2,
+    ...
+  }
+
+  event.connect(...) 
+    === event.connectWithPriority(0, ...)
+    === event.connectWithPriority('weak', ...)
+
+  event.connectStrong(...) 
+    === event.connectWithPriority(1, ...) 
+    === event.connectWithPriority('strong', ...)
+
+  event.connectFactory(...)
+    === event.connectWithPriority(2, ...)
+    === event.connectWithPriority('factory', ...)
+
+  event.pause(...) 
+    === event.pauseWithPriority(0, ...)
+    === event.pauseWithPriority('weak', ...)
+
+  event.pauseStrong(...)
+    === event.pauseWithPriority(1, ...)
+    === event.pauseWithPriority('strong', ...)
+
+  event.pauseFactory(...)
+    === event.pauseWithPriority(2, ...)
+    === event.pauseWithPriority('factory', ...)
+
+  event.pauseWithPriority('*', ...)
+    === event.pauseWithPriority(Infinity, ...)
+
+
+  event.pause('*')
+*/
+
+const pauseSignal = function(priority) {
+
+}
+
+const pauseAllSignal = function() {
+
+}
+
+const resumeSignal = function() {
+
+}
+
+const resumeAllSignal = function() {
+
+}
+
+const setListeningPriority = function() {
+
 }
 
 
@@ -300,21 +394,31 @@ const eventConstructor = (parentEvent, settings) => {
     _customType: 'EventInstance',
     _parentEvent: parentEvent,
     _connections: [],
+    _priorityConnections: [],
     _childEvents: [],
     _propagating: false,
 
-    _stats: {
-      timesFired: 0,
-      timesFiredWhilePaused: 0,
+    _listeningPriority: 0,
+    _pausedPriority: 0,
+    _state: 'listening',
+
+    stats: {
+      timeLastDispatched: 0,
+      dispatchCount: 0,
+      dispatchWhilePausedCount: 0,
     },
 
     settings: {
+      /*
       cooldown: { 
         interval: 1, 
-        duration: 0 
+        duration: 0,
+        reset: 0,
       },
-      fireLimit: -1,
-      link: [],
+
+      dispatchLimit: 1,
+      */
+      linkedEvents: [],
       bubbling: false,
 
       ...settings
@@ -326,6 +430,10 @@ const eventConstructor = (parentEvent, settings) => {
     fireAll: fireAllSignal,
     disconnect: disconnectSignal,
     disconnectAll: disconnectAllSignal,
+    pause: pauseSignal,
+    pauseAll: pauseAllSignal,
+    resume: resumeSignal,
+    resumeAll: resumeAllSignal,
 
     stopPropagating
   }

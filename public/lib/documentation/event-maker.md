@@ -3,13 +3,13 @@
 
 The `EventMaker` library was a side project developed by [William J. Horn](https://github.com/william-horn) during the development of an online browser game called **Adventures of Swindonia**. It is intended to make dealing with *user input*, *event delegation*, *event sequencing*, *asynchronous programming*, and *user control* much easier.
 
+### **Important:** *documentation will probably be out of date during it's current peak developmental stages. Stay posted.*
+
+
 ## FAQ
 
-- What Technologies are Involved?
-  * **None**. Everything is written in native JavaScript.
+- Coming soon
 
-* Does it Handle User Input?
-  - Yes.
 
 ## Getting Started
 
