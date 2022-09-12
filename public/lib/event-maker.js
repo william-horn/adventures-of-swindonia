@@ -1,6 +1,43 @@
+/*
+@author:  William J. Horn
+@file:    event-maker.js
+@date:    09/05/2022
+==================================================================================================================================
+
+@info
+=========
+| ABOUT |
+==================================================================================================================================
+
+EventMaker was built from scratch by William J. Horn with yet another desperate attempt to re-invent the wheel 
+just "because". On a real note though, this is a pretty neat and efficient implementation of custom event handling. 
+
+This library lets you manage:
+
+  * Event bubbling
+  * Event toggling
+  * Creating event sequences (coming soon)
+  * and more
+
+Documentation can be found here: https://github.com/william-horn/adventures-of-swindonia/blob/develop/public/lib/documentation/event-maker.md
+
+==================================================================================================================================
+
+@todo
+========
+| TODO |
+==================================================================================================================================
+
+todo: add event yielding (promise-based awaiting for event dispatches)
+todo: create constructor for event sequences (events for sequential event dispatches, like key combinations)
+todo: implement pause/resume mechanic for events
+todo: implement event connection strength/priorities
+
+==================================================================================================================================
+*/
 
 /*
-  Import helper functions
+  Helper functions
 */
 const {
   modelArgs_beta,
@@ -15,7 +52,21 @@ const recurse = (list, method, ...args) => {
 }
 
 /*
-  Declare method functions
+  Method functions
+*/
+
+/*
+  event.connect(name, func)
+
+  Connects a handler function to an event
+
+  @param name?<string>
+    Name of the event connection
+
+  @param func<function>
+    handler function that runs when the event is fired
+
+  @returns connectionInstance<object>
 */
 const connectSignal = function(name, func) {
   [name, func] = modelArgs_beta([
@@ -32,10 +83,42 @@ const connectSignal = function(name, func) {
   return connection;
 }
 
+/*
+  event.stopPropagation()
+
+  Stops the caller event from propagating through 
+  event bubbling
+
+  @params <void>
+  @returns <void>
+*/
 const stopPropagating = function() {
   this._propagating = false;
 }
 
+/*
+  dispatchEvent(payload, ...args)
+
+  The internal function call for dispatching events
+
+  @param payload<object>
+    The data describing the dispatched event. The payload
+    object is structured as such:
+
+    payload {
+      caller<EventInstance> { ... },
+      event<EventInstance> { ... },
+      signature?<object> {
+        bubbling?<boolean>,
+        continuePropagation?<boolean>
+      }
+    }
+
+  @param ...args<any>
+    The rest of the arguments passed by the user
+      
+  @returns <void>
+*/
 const dispatchEvent = function(payload, ...args) {
   const { event, caller, signature = {} } = payload;
 
@@ -81,7 +164,16 @@ const dispatchEvent = function(payload, ...args) {
   }
 }
 
+/*
+  event.fire(...args)
 
+  The interface method for dispatching event connections
+
+  @params ...args<any>
+    The arguments passed down to the handler function callbacks
+
+  @returns <void>
+*/
 const fireSignal = function(...args) {
   dispatchEvent({
     event: this,
@@ -89,6 +181,17 @@ const fireSignal = function(...args) {
   }, ...args);
 }
 
+/*
+  event.fireAll(...args)
+
+  The interface method for dispatching all event connections
+  and all descendant event connections
+
+  @params ...args<any>
+    The arguments passed down to the handler function callbacks
+
+  @returns <void>
+*/
 const fireAllSignal = function(...args) {
   dispatchEvent({
     event: this,
@@ -101,6 +204,29 @@ const fireAllSignal = function(...args) {
   recurse(this._childEvents, 'fireAll', ...args);
 }
 
+/*
+  event.disconnect(connectionName?<string, connectionInstance>, handlerFunction?<function>)
+
+  The interface method for disconnecting event connections. Arguments passed to this
+  function are filters to target and disconnect individual or groups of event
+  connections.
+
+  @param connectionName<string>
+    The name of the connection instance to be disconnected
+
+  @param connectionName<connectionInstance>
+    The literal connection instance returned from event.connect() to be
+    disconnected
+
+  @param handlerFunction<function>
+    The literal handler function used in the event connections to be
+    disconnected
+
+  @note In the future these arguments will probably be replaced with
+  an options object for more filtering options
+
+  @returns <void>
+*/
 const disconnectSignal = function(connectionName, handlerFunction) {
   const _connections = this._connections;
   let connectionInstance;
@@ -136,7 +262,6 @@ const disconnectSignal = function(connectionName, handlerFunction) {
       _connections.splice(i, 1);
     }
   }
-
 }
 
 const disconnectAllSignal = function(...args) {
@@ -147,6 +272,21 @@ const disconnectAllSignal = function(...args) {
 
 /*
   Declare constructor functions
+*/
+
+/*
+  event(parentEvent?<EventInstance>, settings?<object>)
+
+  Constructor function for creating a standard event
+
+  @param parentEvent<EventInstance>
+    Another event instance that will act as the parent for the current event.
+
+  @param settings<object>
+    An object of additional settings that will configure the behavior of the 
+    current event.
+
+  @returns event<EventInstance>
 */
 const eventConstructor = (parentEvent, settings) => {
 
