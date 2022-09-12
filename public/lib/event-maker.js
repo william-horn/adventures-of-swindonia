@@ -38,7 +38,11 @@ const stopPropagating = function() {
 
 const dispatchEvent = function(payload, ...args) {
   const { event, caller, signature = {} } = payload;
+
+  const linkedEvents = event.settings.link;
   const _connections = event._connections;
+
+  caller._propagating = true;
 
   const _signature = {
     ...caller.settings,
@@ -50,6 +54,20 @@ const dispatchEvent = function(payload, ...args) {
     connection.handler(caller, ...args);
   }
 
+  if (linkedEvents.length > 0) {
+    for (let i = 0; i < linkedEvents.length; i++) {
+      const linkedEvent = linkedEvents[i];
+      dispatchEvent({
+        event: linkedEvent,
+        caller: caller,
+        signature: { 
+          continuePropagation: true,
+          bubbling: linkedEvent.settings.bubbling
+        }
+      }, ...args);
+    }
+  }
+
   if (_signature.bubbling && event._parentEvent && caller._propagating) {
     dispatchEvent({
       caller: event,
@@ -57,23 +75,18 @@ const dispatchEvent = function(payload, ...args) {
       signature: _signature,
     }, ...args);
   }
+
+  if (!_signature.continuePropagation) {
+    caller._propagating = false;
+  }
 }
 
 
 const fireSignal = function(...args) {
-  const { settings } = this;
-  const linkedEvents = settings.linked;
-
   dispatchEvent({
     event: this,
     caller: this
   }, ...args);
-
-  if (linkedEvents.length > 0) {
-    for (let i = 0; i < linkedEvents.length; i++) {
-      linkedEvents[i].fire(this, ...args);
-    }
-  }
 }
 
 const fireAllSignal = function(...args) {
@@ -161,7 +174,7 @@ const eventConstructor = (parentEvent, settings) => {
         duration: 0 
       },
       fireLimit: -1,
-      linked: [],
+      link: [],
       bubbling: false,
 
       ...settings

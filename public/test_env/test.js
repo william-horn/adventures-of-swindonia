@@ -4,19 +4,18 @@ const { event } = require('../lib/event-maker');
 const parentEvent = event();
 const childEvent = event(parentEvent);
 const child2Event = event(parentEvent);
-const subchildEvent = event(child2Event);
+const subchildEvent = event(child2Event, { bubbling: true, link: [parentEvent, childEvent] });
 
 const handler1 = () => console.log('handler #1 fired');
 const handler2 = () => console.log('handler #2 fired');
-const handler3 = () => console.log('handler #3 fired');
+const handler3 = (e) => {console.log('handler 3')}
 
 parentEvent.connect( handler1 );
 childEvent.connect( handler2 );
 child2Event.connect( 'someName', handler3 );
 subchildEvent.connect( handler3 );
 
-parentEvent.disconnectAll({});
-parentEvent.fireAll();
+subchildEvent.fire();
 
 // const func1 = (a, b, c, d, e) => {
 //   [a, b, c, d, e] = modelArgs_beta([
