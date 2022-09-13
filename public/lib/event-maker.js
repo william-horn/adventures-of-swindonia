@@ -53,9 +53,9 @@ const EventEnums = {
   },
 
   StateType: {
-    Listening: 'listening',
-    Paused: 'paused',
-    Disabled: 'disabled'
+    Listening: 'Listening',
+    Paused: 'Paused',
+    Disabled: 'Disabled'
   },
 
   InstanceType: {
@@ -84,7 +84,7 @@ const filterConnectionArgs = (connectionName, handlerFunction) => {
   return modelArgs_beta([
     { rule: [connectionName, 'string'] },
     { rule: [handlerFunction, 'function'] },
-    { rule: [undefined, 'object'] }
+    { rule: [undefined, EventEnums.InstanceType.EventConnection] }
   ]);
 }
 
@@ -236,6 +236,9 @@ const connectWithPriority = function(priority, connectionData) {
     ...connectionData
   };
 
+  // self reference for filtering
+  connection.connectionInstance = connection;
+
   // creating a new connection priority list if one doesn't exist
   if (!connectionRow) {
     connectionList = [];
@@ -251,9 +254,10 @@ const connectWithPriority = function(priority, connectionData) {
     if (_cpo.length > 1) {
       for (let i = _cpo.length - 1; i > 0; i--) {
         if (_cpo[i] < _cpo[i - 1]) {
+          const last = i - 1;
           // swap order index then swap places
-          [_cpo[i - 1].orderIndex, _cpo[i].orderIndex] = [_cpo[i].orderIndex, _cpo[i - 1].orderIndex];
-          [_cpo[i - 1], _cpo[i]] = [_cpo[i], _cpo[i - 1]];
+          [_cpo[last].orderIndex, _cpo[i].orderIndex] = [_cpo[i].orderIndex, _cpo[last].orderIndex];
+          [_cpo[last], _cpo[i]] = [_cpo[i], _cpo[last]];
         } else {
           break;
         }
@@ -348,20 +352,32 @@ const fireAll = function(...args) {
   ...args<connectionName<string>|connectionInstance<object>, handlerFunction<function>>
 */
 const disconnect = function(...args) {
-  let connectionList;
-
   const [
     connectionName, 
     handlerFunction, 
     connectionInstance
   ] = filterConnectionArgs(...args);
 
+  return this.disconnectWithPriority(0, { 
+    name: connectionName, 
+    handler: handlerFunction, 
+    connectionInstance: connectionInstance 
+  })
+}
+
+const disconnectWithPriority = function(priority, connectionData) {
+  priority = getPriority(priority);
+  const { _connectionPriorities, _connectionPriorityOrder: _cpo } = this;
   /*
     special case: if connection object is passed instead of a name or handler function
     then disconnect the connection instance
   */
-  if (connectionInstance) {
+  if (connectionData.connectionInstance) {
     connectionList = this._connectionPriorities[connectionInstance.priority];
+    /*
+      @todo: look into alternative method for removing connection instances.
+      `splice` combined with `findIndex` makes this somewhat costly.
+    */
     connectionList.splice(
       connectionList.findIndex(conn => conn === connectionInstance),
       1
@@ -378,11 +394,17 @@ const disconnect = function(...args) {
   }
 
   // disconnect based on connection name or handler function criteria
-  for (let i = _connections.length - 1; i >= 0; i--) {
-    const connection = _connections[i];
+  const priorityIndex = _cpo[_connectionPriorities[priority].orderIndex];
 
-    if (arguments.length === 0 || isEligibleForDisconnect(connection)) {
-      _connections.splice(i, 1);
+  for (let i = 0; i <= priorityIndex; i++) {
+    const connectionRow = _connectionPriorities[i];
+    const connectionList = connectionRow.connections;
+
+    for (let j = connectionList.length - 1; j >= 0; j--) {
+      const connection = connectionList[j];
+      if (arguments.length === 0 || isEligibleForDisconnect(connection)) {
+        connectionList.splice(j, 1);
+      }
     }
   }
 }
@@ -570,6 +592,7 @@ const Event = (parentEvent, settings) => {
     fire,
     fireAll,
     disconnect,
+    disconnectWithPriority,
     disconnectAll,
     pause,
     resume,
