@@ -21,6 +21,14 @@ This library lets you manage:
 
 Documentation can be found here: https://github.com/william-horn/adventures-of-swindonia/blob/develop/public/lib/documentation/event-maker.md
 
+@changelog
+  [09-13/2022]
+    - Removed event states "Listening" and "Paused" and replaced them with _pausePriority. 
+      If _pausePriority === -1 then the state is assumed to be "Listening", otherwise if
+      _pausePriority > -1 then the state is assumed to be "Paused".
+
+    - connectWithPriority now defaults it's priority number to 1 if no priority is given.
+
 ==================================================================================================================================
 
 @todo
@@ -32,6 +40,8 @@ todo: add event yielding (promise-based awaiting for event dispatches)
 todo: create constructor for event sequences (events for sequential event dispatches, like key combinations)
 todo: implement pause/resume mechanic for events
 todo: implement event connection strength/priorities
+  * DONE - 09/13/2022
+todo: add error handling and centralize error messages
 
 ==================================================================================================================================
 */
@@ -65,12 +75,12 @@ const EventEnums = {
   }
 }
 
-const getPriority = priority => {
+const getPriority = (priority, disableException) => {
   const _priority = typeof priority === 'number' ? priority
     : typeof priority === 'string'
       && EventEnums.ConnectionPriority[toUpperCamelCase(priority)];
 
-  if (typeof _priority === 'undefined') throw 'Invalid priority';
+  if (typeof _priority === 'undefined' && !disableException) throw 'Invalid priority';
 
   return _priority;
 }
@@ -119,11 +129,8 @@ const dispatchEvent = function(payload, ...args) {
   const {
     _connectionPriorities,
     _connectionPriorityOrder: _cpo,
+    _pausePriority,
     settings: { linkedEvents }
-  } = event;
-
-  let {
-    _pausePriority
   } = event;
 
   const _signature = {
@@ -131,25 +138,7 @@ const dispatchEvent = function(payload, ...args) {
     ...signature
   }
 
-  /*
-    @todo: find better solution for handing special case for loop
-
-    The goal here is to start at the end of the connection list
-    and finish before the _pausePriority (while i > _pausePriority). 
-    However, in the case where the event state is listening, the
-    for loop should iterate over all connections (while i >= _pausePriority)
-
-    For now, a temporary solution is to give the for loop an extra
-    iteration by subtracting 1 from the _pausePriority if the event
-    state is listening. if the event state is paused then don't
-    subtract anything.
-
-    I'm not fond of this solution but this is a very small and
-    localized issue that shouldn't scale so this is fine for now.
-  */
-
-  // @note: don't change _pausePriority here if it needs to be used anywhere else in this function
-  if (!event.validateDispatch({ isListening: () => _pausePriority-- })) {
+  if (!event.validateDispatch()) {
     return;
   }
 
@@ -224,7 +213,12 @@ const connect = function(name, handler) {
 
 
 const connectWithPriority = function(priority, connectionData) {
-  priority = getPriority(priority);
+  [priority, connectionData] = modelArgs_beta([
+    { rule: [priority, 'number', {string: getPriority(priority, true)}], default: 1},
+    { rule: [connectionData, 'object']}
+  ]);
+
+  if (!connectionData) throw 'connect method requires connection data';
   const { _connectionPriorities, _connectionPriorityOrder: _cpo } = this;
 
   /*
@@ -417,6 +411,11 @@ const disconnectWithPriority = function(priority, connectionData = {}) {
   */
   if (!priorityIndex) throw 'No such priority number exists';
 
+  /*
+    @todo: we're checking to see if no arguments were passed every cycle of
+    the for loop for disconnection (isEmpty(connectioNData)). Maybe add separate 
+    condition if no arguments were passed, then disconnect all without checking?
+  */
   for (let i = 0; i <= priorityIndex; i++) {
     const connectionRow = _connectionPriorities[_cpo[i]];
     const connectionList = connectionRow.connections;
@@ -468,6 +467,10 @@ const resume = function() {
 
 const isEnabled = function() {
   return this._state !== EventEnums.StateType.Disabled;
+}
+
+const isListening = function() {
+  return this._pausePriority === -1;
 }
 
 
@@ -523,7 +526,7 @@ const validateDispatch = function(caseHandler = {}) {
   }
 
   // event is in listening state
-  if (_state === EventEnums.StateType.Listening) {
+  if (this.isListening()) {
     handleCase('isListening');
     return true;
   }
@@ -582,7 +585,7 @@ const Event = (parentEvent, settings) => {
     _childEvents: [],
     _propagating: false,
 
-    _pausePriority: 0,
+    _pausePriority: -1,
     _state: EventEnums.StateType.Listening, // listening | paused:priority_1 | disabled
 
     stats: {
@@ -619,6 +622,7 @@ const Event = (parentEvent, settings) => {
     resume,
     validateDispatch,
     isEnabled,
+    isListening,
     stopPropagating
   }
 
