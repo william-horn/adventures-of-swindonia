@@ -1,0 +1,24 @@
+{
+  "name": "public",
+  "version": "1.0.0",
+  "description": "",
+  "main": "game.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "nodemon test_env/test",
+    "build": "browserify game.js -o dist/game-bundle.js",
+    "watch": "watchify game.js -o dist/game-bundle.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@math.gl/core": "^3.6.3"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.19",
+    "watchify": "^4.0.0"
+  }
+}

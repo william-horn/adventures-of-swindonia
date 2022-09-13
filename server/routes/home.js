@@ -3,7 +3,7 @@ const router = require('express').Router();
 const path = require('path');
 
 const GET_root = (req, res) => {
-    res.status(200).sendFile(path.join(__dirname, '../../client/game.html'));
+    res.status(200).sendFile(path.join(__dirname, '../../public/pages/game.html'));
 }
 
 const POST_root = (req, res) => {}
