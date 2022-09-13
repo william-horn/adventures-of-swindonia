@@ -400,16 +400,15 @@ KeyboardEvent.fireAll()
     => B was pressed!
 
 
-## testing
+## Connection Priority
 ```js
-const parentEvent = event()
-const childEvent = event(parentEvent, {
-  linked: [parentEvent],
-  bubbling: true
-})
+const event = EventMaker.event();
+const handler = () => console.log('ran handler');
 
+event.connectWithPriority('name', handler);
+event.pause(1)
+event.pause('*')
 
-
-
+event.pauseAll(1)
 
 ```

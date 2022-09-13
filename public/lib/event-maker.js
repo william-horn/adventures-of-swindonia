@@ -41,9 +41,27 @@ todo: implement event connection strength/priorities
 */
 const {
   modelArgs_beta,
-  objectMeetsCriteria
+  objectMeetsCriteria,
+  toUpperCamelCase
 } = require('../../lib/helpers');
 
+const EventEnums = {
+  ConnectionPriority: {
+    Weak: 0,
+    Strong: 1,
+    Factory: 2
+  }
+}
+
+const getPriority = priority => {
+  const _priority = typeof priority === 'number' ? priority
+    : typeof priority === 'string'
+      && EventEnums.ConnectionPriority[toUpperCamelCase(priority)];
+
+  if (typeof _priority === 'undefined') throw 'Invalid priority';
+
+  return _priority;
+}
 
 const recurse = (list, method, ...args) => {
   for (let i = 0; i < list.length; i++) {
@@ -51,50 +69,14 @@ const recurse = (list, method, ...args) => {
   }
 }
 
-/*
-  Method functions
-*/
-
-/*
-  event.connect(name, func)
-
-  Connects a handler function to an event
-
-  @param name?<string>
-    Name of the event connection
-
-  @param func<function>
-    handler function that runs when the event is fired
-
-  @returns connectionInstance<object>
-*/
-const connectSignal = function(name, func) {
-  [name, func] = modelArgs_beta([
-    { rule: [name, 'string'] },
-    { rule: [func, 'function', {string: () => name}] }
+const filterConnectionArgs = (connectionName, handlerFunction) => {
+  return modelArgs_beta([
+    { rule: [connectionName, 'string'] },
+    { rule: [handlerFunction, 'function'] },
+    { rule: [undefined, 'object'] }
   ]);
-
-  const connection = {
-    handler: func,
-    name: name,
-  }
-
-  this._connections.push(connection);
-  return connection;
 }
 
-/*
-  event.stopPropagation()
-
-  Stops the caller event from propagating through 
-  event bubbling
-
-  @params <void>
-  @returns <void>
-*/
-const stopPropagating = function() {
-  this._propagating = false;
-}
 
 /*
   dispatchEvent(payload, ...args)
@@ -134,7 +116,9 @@ const dispatchEvent = function(payload, ...args) {
   } = event.stats
 
   const {
-    _connections,
+    _connectionPriorities,
+    _connectionPriorityOrder: _cpo,
+    _pausePriority
   } = event;
 
   const _signature = {
@@ -142,18 +126,19 @@ const dispatchEvent = function(payload, ...args) {
     ...signature
   }
 
-  // todo: when event state is implemented add a guard clause here when limit is reached
-  if (dispatchLimit && dispatchCount >= dispatchLimit) {
-    console.log('dispatch limit reached');
-    return event.disconnect();
+  if (!event.isEligibleForDispatch()) {
+    return;
   }
 
-  event.stats.dispatchCount++;
   caller._propagating = true;
 
-  for (let i = 0; i < _connections.length; i++) {
-    const connection = _connections[i];
-    connection.handler(caller, ...args);
+  for (let i = _cpo.length - 1; i > _pausePriority; i--) {
+    const connectionList = _connectionPriorities[i];
+
+    for (let j = 0; j < connectionList.length; j++) {
+      const connection = connectionList[i];
+      connection.handler(caller, ...args);
+    }
   }
 
   if (linkedEvents.length > 0) {
@@ -183,6 +168,81 @@ const dispatchEvent = function(payload, ...args) {
   }
 }
 
+
+
+/*
+  Method functions
+*/
+
+/*
+  event.connect(name, func)
+
+  Connects a handler function to an event
+
+  @param name?<string>
+    Name of the event connection
+
+  @param handler<function>
+    handler function that runs when the event is fired
+
+  @returns connectionInstance<object>
+*/
+const connect = function(name, handler) {
+  [name, handler] = modelArgs_beta([
+    { rule: [name, 'string'] },
+    { rule: [handler, 'function', {string: () => name}] }
+  ]);
+
+  return this.connectWithPriority(0, { name, handler });
+}
+
+
+const connectWithPriority = function(priority, connectionData) {
+  priority = getPriority(priority);
+  const { _connectionPriorities, _connectionPriorityOrder: _cpo } = this;
+
+  let connectionList = _connectionPriorities[priority];
+
+  const connection = {
+    _active: true,
+    ...connectionData
+  };
+
+  // creating a new connection priority list if one doesn't exist
+  if (!connectionList) {
+    connectionList = [];
+    _connectionPriorities[priority] = connectionList;
+    _cpo.push(priority);
+
+    // sort connection priority indices
+    if (_cpo.length > 1) {
+      for (let i = _cpo.length - 1; i > 0; i--) {
+        if (_cpo[i] < _cpo[i - 1]) {
+          [_cpo[i - 1], _cpo[i]] = [_cpo[i], _cpo[i - 1]];
+        } else {
+          break;
+        }
+      }
+    }
+  }
+
+  connectionList.push(connection);
+  return connection;
+}
+
+/*
+  event.stopPropagation()
+
+  Stops the caller event from propagating through 
+  event bubbling
+
+  @params <void>
+  @returns <void>
+*/
+const stopPropagating = function() {
+  this._propagating = false;
+}
+
 /*
   event.fire(...args)
 
@@ -193,7 +253,7 @@ const dispatchEvent = function(payload, ...args) {
 
   @returns <void>
 */
-const fireSignal = function(...args) {
+const fire = function(...args) {
   dispatchEvent({
     event: this,
     caller: this
@@ -211,7 +271,7 @@ const fireSignal = function(...args) {
 
   @returns <void>
 */
-const fireAllSignal = function(...args) {
+const fireAll = function(...args) {
   dispatchEvent({
     event: this,
     caller: this,
@@ -246,15 +306,18 @@ const fireAllSignal = function(...args) {
 
   @returns <void>
 */
-const disconnectSignal = function(connectionName, handlerFunction) {
-  const _connections = this._connections;
-  let connectionInstance;
 
-  [connectionName, handlerFunction, connectionInstance] = modelArgs_beta([
-    { rule: [connectionName, 'string'] },
-    { rule: [handlerFunction, 'function'] },
-    { rule: [connectionInstance, 'object'] }
-  ]);
+/*
+  ...args<connectionName<string>|connectionInstance<object>, handlerFunction<function>>
+*/
+const disconnect = function(...args) {
+  const _connections = this._connections;
+
+  const [
+    connectionName, 
+    handlerFunction, 
+    connectionInstance
+  ] = filterConnectionArgs(...args);
 
   /*
     special case: if connection object is passed instead of a name or handler function
@@ -296,73 +359,61 @@ const disconnectSignal = function(connectionName, handlerFunction) {
 
   @returns <void>
 */
-const disconnectAllSignal = function(...args) {
+const disconnectAll = function(...args) {
   this.disconnect(...args);
   recurse(this._childEvents, 'disconnectAll', ...args);
 }
 
 
+const pause = function(...args) {
+  const [
+    connectionName, 
+    handlerFunction, 
+    connectionInstance
+  ] = filterConnectionArgs(...args);
+}
+
 /*
-  event.connectWithPriority(1, 'name', handler)
 
-  priorityEnums {
-    weak: 0
-    strong: 1,
-    factory: 2,
-    ...
-  }
+*/ 
 
-  event.connect(...) 
-    === event.connectWithPriority(0, ...)
-    === event.connectWithPriority('weak', ...)
+const pauseWithPriority = function(priority, connectionData) {
+  priority = getPriority(priority);
+}
 
-  event.connectStrong(...) 
-    === event.connectWithPriority(1, ...) 
-    === event.connectWithPriority('strong', ...)
-
-  event.connectFactory(...)
-    === event.connectWithPriority(2, ...)
-    === event.connectWithPriority('factory', ...)
-
-  event.pause(...) 
-    === event.pauseWithPriority(0, ...)
-    === event.pauseWithPriority('weak', ...)
-
-  event.pauseStrong(...)
-    === event.pauseWithPriority(1, ...)
-    === event.pauseWithPriority('strong', ...)
-
-  event.pauseFactory(...)
-    === event.pauseWithPriority(2, ...)
-    === event.pauseWithPriority('factory', ...)
-
-  event.pauseWithPriority('*', ...)
-    === event.pauseWithPriority(Infinity, ...)
-
-
-  event.pause('*')
-*/
-
-const pauseSignal = function(priority) {
+const resume = function() {
 
 }
 
-const pauseAllSignal = function() {
-
+const isEnabled = function() {
+  return this._state !== 'disabled';
 }
 
-const resumeSignal = function() {
+const isEligibleForDispatch = function() {
+  const { 
+    _connectionPriorityOrder: _cpo, 
+    _pausePriority,
+    _state
+  } = this;
 
+  const highestPriority = _cpo[_cpo.length - 1];
+
+  // connections list is empty; no connections exist
+  if (_cpo.length === 0) return false;
+
+  // event has been disabled
+  if (!this.isEnabled()) return false;
+  
+  // highest priority connection is greater than the paused priority
+  if (highestPriority > _pausePriority) return true;
+
+  // highest priority is the only priority and event is listening
+  if (highestPriority === _pausePriority && _state === 'listening') return true;
+
+  // todo: possibly reduce logic further in the future
+  // return _cpo.length > 0 && this.isEnabled()
+  //   && ((highestPriority > _pausePriority) || _state === 'listening');
 }
-
-const resumeAllSignal = function() {
-
-}
-
-const setListeningPriority = function() {
-
-}
-
 
 /*
   Declare constructor functions
@@ -382,7 +433,7 @@ const setListeningPriority = function() {
 
   @returns event<EventInstance>
 */
-const eventConstructor = (parentEvent, settings) => {
+const Event = (parentEvent, settings) => {
 
   [parentEvent, settings] = modelArgs_beta([
     { rule: [parentEvent, 'EventInstance'] },
@@ -393,14 +444,17 @@ const eventConstructor = (parentEvent, settings) => {
     // event fields
     _customType: 'EventInstance',
     _parentEvent: parentEvent,
-    _connections: [],
-    _priorityConnections: [],
+    // _connections: [],
+    // _priorityConnections: [],
+    // _connectionPriorityOrder: [0, 3, 6, ...]
+    // _connectionPriorities: {['0']: [], ['1']: [], ...},
+    _connectionPriorityOrder: [],
+    _connectionPriorities: {},
     _childEvents: [],
     _propagating: false,
 
-    _listeningPriority: 0,
-    _pausedPriority: 0,
-    _state: 'listening',
+    _pausePriority: 0,
+    _state: 'listening', // listening | paused:priority_1 | disabled
 
     stats: {
       timeLastDispatched: 0,
@@ -425,16 +479,16 @@ const eventConstructor = (parentEvent, settings) => {
     },
 
     // event methods
-    connect: connectSignal,
-    fire: fireSignal,
-    fireAll: fireAllSignal,
-    disconnect: disconnectSignal,
-    disconnectAll: disconnectAllSignal,
-    pause: pauseSignal,
-    pauseAll: pauseAllSignal,
-    resume: resumeSignal,
-    resumeAll: resumeAllSignal,
-
+    connect,
+    connectWithPriority,
+    fire,
+    fireAll,
+    disconnect,
+    disconnectAll,
+    pause,
+    resume,
+    isEligibleForDispatch,
+    isEnabled,
     stopPropagating
   }
 
@@ -445,6 +499,8 @@ const eventConstructor = (parentEvent, settings) => {
 }
 
 module.exports = {
-  event: eventConstructor,
+  Event,
+  EventEnums,
+  getPriority
 }
 

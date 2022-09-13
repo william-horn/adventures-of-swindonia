@@ -1,31 +1,16 @@
 const {modelArgs, modelArgs_beta} = require('../../lib/helpers');
-const { event } = require('../lib/event-maker');
+const { Event } = require('../lib/event-maker');
 
-const parentEvent = event();
-const childEvent = event(parentEvent);
-const child2Event = event(parentEvent);
+const testEvent = Event();
 
-const subchildEvent = event(child2Event);
+const handler = (e) => console.log('handler ran', e.poop);
+const handler2 = (e) => {e.poop = 'butt'; console.log('handler ran')};
 
-const handler1 = () => console.log('handler #1 fired');
-const handler2 = () => console.log('handler #2 fired');
-const handler3 = (e) => {console.log('handler 3')}
-
-parentEvent.connect( handler1 );
-childEvent.connect( handler2 );
-child2Event.connect( 'someName', handler3 );
-subchildEvent.connect( handler3 );
-
-const singleEvent = event({dispatchLimit: 5});
-
-singleEvent.connect(() => console.log('single event ran'));
-
-singleEvent.fire();
-singleEvent.fire();
-singleEvent.fire();
-singleEvent.fire();
-singleEvent.fire();
-singleEvent.fire();
+testEvent.connect('someName', handler);
+testEvent.connectWithPriority(4, { name: 'anotherName', handler2 });
+testEvent.connectWithPriority(2, { name: 'yetAnother', handler });
+testEvent.connectWithPriority(7, { name: 'tom', handler });
+// testEvent.fire();
 
 // const func1 = (a, b, c, d, e) => {
 //   [a, b, c, d, e] = modelArgs_beta([
