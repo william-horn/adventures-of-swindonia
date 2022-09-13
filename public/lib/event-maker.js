@@ -50,6 +50,12 @@ const EventEnums = {
     Weak: 0,
     Strong: 1,
     Factory: 2
+  },
+
+  StateType: {
+    Listening: 'listening',
+    Paused: 'paused',
+    Disabled: 'disabled'
   }
 }
 
@@ -104,29 +110,37 @@ const filterConnectionArgs = (connectionName, handlerFunction) => {
 const dispatchEvent = function(payload, ...args) {
   const { event, caller, signature = {} } = payload;
 
-  const { 
-    linkedEvents,
-    cooldown,
-    dispatchLimit
-  } = event.settings;
-
-  const {
-    timeLastDispatched,
-    dispatchCount,
-  } = event.stats
-
   const {
     _connectionPriorities,
     _connectionPriorityOrder: _cpo,
-    _pausePriority
-  } = event;
+    _pausePriority,
+    settings: { linkedEvents }
+  } = this;
 
   const _signature = {
     ...caller.settings,
     ...signature
   }
 
-  if (!event.isEligibleForDispatch()) {
+  /*
+    @todo: find better solution for handing special case for loop
+
+    The goal here is to start at the end of the connection list
+    and finish before the _pausePriority (while i > _pausePriority). 
+    However, in the case where the event state is listening, the
+    for loop should iterate over all connections (while i >= _pausePriority)
+
+    For now, a temporary solution is to give the for loop an extra
+    iteration by subtracting 1 from the _pausedPriority if the event
+    state is listening. if the event state is paused then don't
+    subtract anything.
+
+    I'm not fond of this solution but this is a very small and
+    localized issue that shouldn't scale so this is fine for now.
+  */
+
+  // @note: don't change _pausePriority here if it needs to be used anywhere else in this function
+  if (!event.validateDispatch({ isListening: () => _pausePriority-- })) {
     return;
   }
 
@@ -148,7 +162,7 @@ const dispatchEvent = function(payload, ...args) {
         event: linkedEvent,
         caller: caller,
         signature: { 
-          // continuePropagation: doesn't set _propagating to false after linked events fire
+          // continuePropagation: doesn't set _propagating to false after firing other branched events
           continuePropagation: true,
           bubbling: linkedEvent.settings.bubbling
         }
@@ -163,9 +177,11 @@ const dispatchEvent = function(payload, ...args) {
       signature: _signature,
     }, ...args);
 
-  } else if (!_signature.continuePropagation) {
-    caller._propagating = false;
   }
+
+  // not necessary to set _propagating back to false but helps for readability in the console
+  // _propagating will remain true if continuePropagation is enabled and a parent event exists
+  caller._propagating = Boolean(_signature.continuePropagation) && event._parentEvent;
 }
 
 
@@ -386,29 +402,72 @@ const resume = function() {
 }
 
 const isEnabled = function() {
-  return this._state !== 'disabled';
+  return this._state !== EventEnums.StateType.Disabled;
 }
 
-const isEligibleForDispatch = function() {
+
+/*
+  validateDispatch({ 
+    isDisabled: () => if event is disabled
+    noConnection: () => no connections exist
+    dispatchLimitReached: () => event dispatch limit is reached,
+    isListening: () => event is listening,
+    hasPriorityDiff: () => event is paused but has available connections of higher priority
+  });
+*/
+const validateDispatch = function(caseHandler = {}) {
   const { 
     _connectionPriorityOrder: _cpo, 
     _pausePriority,
-    _state
+    _state,
+    settings: { dispatchLimit },
+    stats: { 
+      timeLastDispatched,
+      dispatchCount
+    },
   } = this;
 
   const highestPriority = _cpo[_cpo.length - 1];
 
-  // connections list is empty; no connections exist
-  if (_cpo.length === 0) return false;
+  const handleCase = (cause, ...args) => {
+    if (caseHandler[cause]) {
+      return caseHandler[cause](...args);
+    }
+  }
+
+  /*
+    Begin case-checking 
+  */
 
   // event has been disabled
-  if (!this.isEnabled()) return false;
-  
-  // highest priority connection is greater than the paused priority
-  if (highestPriority > _pausePriority) return true;
+  if (!this.isEnabled()) {
+    handleCase('isDisabled');
+    return false;
+  }
 
-  // highest priority is the only priority and event is listening
-  if (highestPriority === _pausePriority && _state === 'listening') return true;
+  // connections list is empty; no connections exist
+  if (_cpo.length === 0) {
+    handleCase('noConnection');
+    return false;
+  }
+
+  // event exceeded dispatch limit set by user
+  if (dispatchCount >= dispatchLimit) {
+    handleCase('dispatchLimitReached');
+    return false;
+  }
+
+  // event is in listening state
+  if (_state === EventEnums.StateType.Listening) {
+    handleCase('isListening');
+    return true;
+  }
+  
+  // event state is paused but higher connection priorities exist
+  if (highestPriority > _pausePriority) {
+    handleCase('hasPriorityDiff');
+    return true;
+  }
 
   // todo: possibly reduce logic further in the future
   // return _cpo.length > 0 && this.isEnabled()
@@ -454,7 +513,7 @@ const Event = (parentEvent, settings) => {
     _propagating: false,
 
     _pausePriority: 0,
-    _state: 'listening', // listening | paused:priority_1 | disabled
+    _state: EventEnums.StateType.Listening, // listening | paused:priority_1 | disabled
 
     stats: {
       timeLastDispatched: 0,
@@ -487,7 +546,7 @@ const Event = (parentEvent, settings) => {
     disconnectAll,
     pause,
     resume,
-    isEligibleForDispatch,
+    validateDispatch,
     isEnabled,
     stopPropagating
   }
