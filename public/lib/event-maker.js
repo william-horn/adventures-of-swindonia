@@ -42,7 +42,8 @@ todo: implement event connection strength/priorities
 const {
   modelArgs_beta,
   objectMeetsCriteria,
-  toUpperCamelCase
+  toUpperCamelCase,
+  isEmpty
 } = require('../../lib/helpers');
 
 const EventEnums = {
@@ -118,9 +119,12 @@ const dispatchEvent = function(payload, ...args) {
   const {
     _connectionPriorities,
     _connectionPriorityOrder: _cpo,
-    _pausePriority,
     settings: { linkedEvents }
-  } = this;
+  } = event;
+
+  let {
+    _pausePriority
+  } = event;
 
   const _signature = {
     ...caller.settings,
@@ -136,7 +140,7 @@ const dispatchEvent = function(payload, ...args) {
     for loop should iterate over all connections (while i >= _pausePriority)
 
     For now, a temporary solution is to give the for loop an extra
-    iteration by subtracting 1 from the _pausedPriority if the event
+    iteration by subtracting 1 from the _pausePriority if the event
     state is listening. if the event state is paused then don't
     subtract anything.
 
@@ -152,7 +156,7 @@ const dispatchEvent = function(payload, ...args) {
   caller._propagating = true;
 
   for (let i = _cpo.length - 1; i > _pausePriority; i--) {
-    const connectionRow = _connectionPriorities[i];
+    const connectionRow = _connectionPriorities[_cpo[i]];
     const connectionList = connectionRow.connections;
 
     for (let j = 0; j < connectionList.length; j++) {
@@ -261,7 +265,7 @@ const connectWithPriority = function(priority, connectionData) {
           // swap order index then swap places
           [connectionRow.orderIndex, lastRow.orderIndex] = [lastRow.orderIndex, connectionRow.orderIndex];
           [_cpo[last], _cpo[now]] = [_cpo[now], _cpo[last]];
-          
+
         } else {
           break;
         }
@@ -369,7 +373,7 @@ const disconnect = function(...args) {
   })
 }
 
-const disconnectWithPriority = function(priority, connectionData) {
+const disconnectWithPriority = function(priority, connectionData = {}) {
   priority = getPriority(priority);
   const { _connectionPriorities, _connectionPriorityOrder: _cpo } = this;
 
@@ -377,7 +381,11 @@ const disconnectWithPriority = function(priority, connectionData) {
     special case: if connection object is passed instead of a name or handler function
     then disconnect the connection instance
   */
-  const connectionInstance = connectionData.connectionInstance;
+  const {
+    name: connectionName,
+    handler: handlerFunction,
+    connectionInstance
+  } = connectionData;
 
   if (connectionInstance) {
     const connectionList = this._connectionPriorities[connectionInstance._priority].connections;
@@ -401,15 +409,21 @@ const disconnectWithPriority = function(priority, connectionData) {
     ]); 
   }
 
-  const priorityIndex = _cpo[_connectionPriorities[priority].orderIndex];
+  const priorityIndex = _connectionPriorities[priority]?.orderIndex;
+
+  /* 
+    @todo: maybe handle this differently in the future to allow disconnecting with 
+    priority numbers that haven't been created yet?
+  */
+  if (!priorityIndex) throw 'No such priority number exists';
 
   for (let i = 0; i <= priorityIndex; i++) {
-    const connectionRow = _connectionPriorities[i];
+    const connectionRow = _connectionPriorities[_cpo[i]];
     const connectionList = connectionRow.connections;
 
     for (let j = connectionList.length - 1; j >= 0; j--) {
       const connection = connectionList[j];
-      if (arguments.length === 0 || isEligibleForDisconnect(connection)) {
+      if (isEmpty(connectionData) || isEligibleForDisconnect(connection)) {
         connectionList.splice(j, 1);
       }
     }

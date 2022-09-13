@@ -1,16 +1,22 @@
 const {modelArgs, modelArgs_beta} = require('../../lib/helpers');
 const { Event } = require('../lib/event-maker');
 
-const testEvent = Event();
+const parentEvent = Event();
+const testEvent = Event(parentEvent, { bubbling: true });
 
-const handler = (e) => console.log('handler ran', e.poop);
-const handler2 = (e) => {e.poop = 'butt'; console.log('handler ran')};
+const handler = (e) => console.log('handler ran 1');
+const handler2 = (e) => console.log('handler ran 2');
 
-testEvent.connectWithPriority(5, { handler });
-testEvent.connectWithPriority(3, { handler });
-testEvent.connectWithPriority(0, { handler });
+testEvent.connectWithPriority(0, { handler, name: 'bob' });
+testEvent.connectWithPriority(0, { handler: () => console.log('new thing') });
+// testEvent.connect(handler2);
+testEvent.connectWithPriority(3, { handler: handler2 });
 testEvent.connectWithPriority(2, { handler });
 console.log(testEvent);
+testEvent.fire();
+testEvent.disconnectWithPriority(1);
+console.log('after disconnect:');
+testEvent.fire();
 
 // testEvent.fire();
 
