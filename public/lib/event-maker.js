@@ -56,6 +56,11 @@ const EventEnums = {
     Listening: 'listening',
     Paused: 'paused',
     Disabled: 'disabled'
+  },
+
+  InstanceType: {
+    EventConnection: 'EventConnection',
+    EventInstance: 'EventInstance'
   }
 }
 
@@ -147,7 +152,8 @@ const dispatchEvent = function(payload, ...args) {
   caller._propagating = true;
 
   for (let i = _cpo.length - 1; i > _pausePriority; i--) {
-    const connectionList = _connectionPriorities[i];
+    const connectionRow = _connectionPriorities[i];
+    const connectionList = connectionRow.connections;
 
     for (let j = 0; j < connectionList.length; j++) {
       const connection = connectionList[i];
@@ -217,29 +223,44 @@ const connectWithPriority = function(priority, connectionData) {
   priority = getPriority(priority);
   const { _connectionPriorities, _connectionPriorityOrder: _cpo } = this;
 
-  let connectionList = _connectionPriorities[priority];
+  /*
+    connectionRow = {orderIndex: 0, connections: [...]}
+  */
+  let connectionRow = _connectionPriorities[priority];
+  let connectionList;
 
   const connection = {
+    _customType: EventEnums.InstanceType.EventConnection,
+    _priority: priority,
     _active: true,
     ...connectionData
   };
 
   // creating a new connection priority list if one doesn't exist
-  if (!connectionList) {
+  if (!connectionRow) {
     connectionList = [];
-    _connectionPriorities[priority] = connectionList;
+    connectionRow = {
+      orderIndex: _cpo.length, 
+      connections: connectionList
+    };
+
+    _connectionPriorities[priority] = connectionRow;
     _cpo.push(priority);
 
     // sort connection priority indices
     if (_cpo.length > 1) {
       for (let i = _cpo.length - 1; i > 0; i--) {
         if (_cpo[i] < _cpo[i - 1]) {
+          // swap order index then swap places
+          [_cpo[i - 1].orderIndex, _cpo[i].orderIndex] = [_cpo[i].orderIndex, _cpo[i - 1].orderIndex];
           [_cpo[i - 1], _cpo[i]] = [_cpo[i], _cpo[i - 1]];
         } else {
           break;
         }
       }
     }
+  } else {
+    connectionList = connectionRow.connections;
   }
 
   connectionList.push(connection);
@@ -327,7 +348,7 @@ const fireAll = function(...args) {
   ...args<connectionName<string>|connectionInstance<object>, handlerFunction<function>>
 */
 const disconnect = function(...args) {
-  const _connections = this._connections;
+  let connectionList;
 
   const [
     connectionName, 
@@ -340,8 +361,9 @@ const disconnect = function(...args) {
     then disconnect the connection instance
   */
   if (connectionInstance) {
-    _connections.splice(
-      _connections.findIndex(conn => conn === connectionInstance),
+    connectionList = this._connectionPriorities[connectionInstance.priority];
+    connectionList.splice(
+      connectionList.findIndex(conn => conn === connectionInstance),
       1
     );
 
@@ -495,18 +517,23 @@ const validateDispatch = function(caseHandler = {}) {
 const Event = (parentEvent, settings) => {
 
   [parentEvent, settings] = modelArgs_beta([
-    { rule: [parentEvent, 'EventInstance'] },
+    { rule: [parentEvent, EventEnums.InstanceType.EventInstance] },
     { rule: [settings, 'object'], default: {} }
   ]);
 
   const event = {
     // event fields
-    _customType: 'EventInstance',
+    _customType: EventEnums.InstanceType.EventInstance,
     _parentEvent: parentEvent,
-    // _connections: [],
-    // _priorityConnections: [],
-    // _connectionPriorityOrder: [0, 3, 6, ...]
-    // _connectionPriorities: {['0']: [], ['1']: [], ...},
+    /* 
+      _connectionPriorityOrder: [0, 3, 5]
+      _connectionPriorities: { 
+        ['5']: {orderIndex: 2, connections: []},
+        ['0']: {orderIndex: 0, connections: []},
+        ['3']: {orderIndex: 1, connections: []},
+      }
+
+    */
     _connectionPriorityOrder: [],
     _connectionPriorities: {},
     _childEvents: [],
