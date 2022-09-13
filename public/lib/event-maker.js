@@ -156,7 +156,7 @@ const dispatchEvent = function(payload, ...args) {
     const connectionList = connectionRow.connections;
 
     for (let j = 0; j < connectionList.length; j++) {
-      const connection = connectionList[i];
+      const connection = connectionList[j];
       connection.handler(caller, ...args);
     }
   }
@@ -252,12 +252,16 @@ const connectWithPriority = function(priority, connectionData) {
 
     // sort connection priority indices
     if (_cpo.length > 1) {
-      for (let i = _cpo.length - 1; i > 0; i--) {
-        if (_cpo[i] < _cpo[i - 1]) {
-          const last = i - 1;
+      for (let now = _cpo.length - 1; now > 0; now--) {
+        const last = now - 1;
+
+        if (_cpo[now] < _cpo[last]) {
+          const lastRow = _connectionPriorities[_cpo[last]];
+
           // swap order index then swap places
-          [_cpo[last].orderIndex, _cpo[i].orderIndex] = [_cpo[i].orderIndex, _cpo[last].orderIndex];
-          [_cpo[last], _cpo[i]] = [_cpo[i], _cpo[last]];
+          [connectionRow.orderIndex, lastRow.orderIndex] = [lastRow.orderIndex, connectionRow.orderIndex];
+          [_cpo[last], _cpo[now]] = [_cpo[now], _cpo[last]];
+          
         } else {
           break;
         }
@@ -368,12 +372,15 @@ const disconnect = function(...args) {
 const disconnectWithPriority = function(priority, connectionData) {
   priority = getPriority(priority);
   const { _connectionPriorities, _connectionPriorityOrder: _cpo } = this;
+
   /*
     special case: if connection object is passed instead of a name or handler function
     then disconnect the connection instance
   */
-  if (connectionData.connectionInstance) {
-    connectionList = this._connectionPriorities[connectionInstance.priority];
+  const connectionInstance = connectionData.connectionInstance;
+
+  if (connectionInstance) {
+    const connectionList = this._connectionPriorities[connectionInstance._priority].connections;
     /*
       @todo: look into alternative method for removing connection instances.
       `splice` combined with `findIndex` makes this somewhat costly.
@@ -386,6 +393,7 @@ const disconnectWithPriority = function(priority, connectionData) {
     return;
   }
 
+  // disconnect based on connection name or handler function criteria
   const isEligibleForDisconnect = connection => {
     return objectMeetsCriteria(connection, [
       { key: 'name', equals: connectionName, ignoreUndefined: true },
@@ -393,7 +401,6 @@ const disconnectWithPriority = function(priority, connectionData) {
     ]); 
   }
 
-  // disconnect based on connection name or handler function criteria
   const priorityIndex = _cpo[_connectionPriorities[priority].orderIndex];
 
   for (let i = 0; i <= priorityIndex; i++) {
@@ -475,7 +482,7 @@ const validateDispatch = function(caseHandler = {}) {
 
   const handleCase = (cause, ...args) => {
     if (caseHandler[cause]) {
-      return caseHandler[cause](...args);
+      caseHandler[cause](...args);
     }
   }
 
