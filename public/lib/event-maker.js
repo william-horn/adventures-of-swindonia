@@ -142,6 +142,7 @@ const dispatchEvent = function(payload, ...args) {
     _connectionPriorities,
     _connectionPriorityOrder: _cpo,
     _pausePriority,
+    _resolvers,
     settings: { linkedEvents },
     stats
   } = event;
@@ -166,6 +167,11 @@ const dispatchEvent = function(payload, ...args) {
       const connection = connectionList[j];
       connection.handler(caller, ...args);
     }
+  }
+
+  // fire all wait resolvers
+  for (let i = 0; i < _resolvers.length; i++) {
+    _resolvers[i]([...args]);
   }
 
   if (linkedEvents.length > 0) {
@@ -473,6 +479,15 @@ const disconnectAllWithPriority = function(...args) {
   recurse(this._childEvents, 'disconnectAllWithPriority', ...args);
 }
 
+const wait = function(timeout) {
+  return new Promise((resolve, reject) => {
+    this._resolvers.push(resolve);
+    if (timeout !== undefined) {
+      setTimeout(() => reject('Event timed out'), timeout*1000);
+    }
+  });
+}
+
 
 const pause = function(...args) {
   const [
@@ -503,7 +518,27 @@ const pauseWithPriority = function(priority, connectionData = {}) {
 
 }
 
+const pauseAll = function() {
+
+}
+
+const pauseAllWithPriority = function() {
+
+}
+
 const resume = function() {
+
+}
+
+const resumeAll = function() {
+
+}
+
+const resumeWithPriority = function() {
+
+}
+
+const resumeAllWithPriority = function() {
 
 }
 
@@ -635,6 +670,7 @@ const Event = (parentEvent, settings) => {
     _connectionPriorityOrder: [],
     _connectionPriorities: {},
     _childEvents: [],
+    _resolvers: [],
     _propagating: false,
 
     _pausePriority: -1,
@@ -672,8 +708,15 @@ const Event = (parentEvent, settings) => {
     disconnectAll,
     disconnectAllWithPriority,
     pause,
+    pauseAll,
+    pauseWithPriority,
+    pauseAllWithPriority,
     resume,
+    resumeAll,
+    resumeWithPriority,
+    resumeAllWithPriority,
     validateNextDispatch,
+    wait,
     isEnabled,
     isListening,
     stopPropagating

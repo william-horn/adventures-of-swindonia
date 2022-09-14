@@ -2,21 +2,45 @@ const {modelArgs, modelArgs_beta} = require('../../lib/helpers');
 const inspect = require('util').inspect;
 const { Event } = require('../lib/event-maker');
 
-const show = obj => console.log(inspect(obj, {showHidden: false, depth: null, colors: true}));
+// const show = obj => console.log(inspect(obj, {showHidden: false, depth: null, colors: true}));
 
-const parentEvent = Event();
-const childEvent = Event(parentEvent, { bubbling: true, dispatchLimit: 4 });
+// const parentEvent = Event();
+// const childEvent = Event(parentEvent, { bubbling: true, dispatchLimit: 4 });
 
-childEvent.connect('name1', () => console.log('event with prio 0'));
-childEvent.connectWithPriority(3, { handler: () => console.log('event with prio 3') });
-childEvent.connectWithPriority(5, { handler: () => console.log('event with prio 5') });
-parentEvent.connect(() => console.log('parent event fired'));
+// childEvent.connect('name1', () => console.log('event with prio 0'));
+// childEvent.connectWithPriority(3, { handler: () => console.log('event with prio 3') });
+// childEvent.connectWithPriority(5, { handler: () => console.log('event with prio 5') });
+// parentEvent.connect(() => console.log('parent event fired'));
+
+
+const event = Event();
+
+event.connect(() => console.log('event fired'));
+
+(async () => {
+  console.log('waiting for event...');
+  try {
+    const results = await event.wait(3);
+    console.log('results: ', results);
+    console.log('event waiting stopped');
+  } catch(err) {
+    console.log(err);
+  }
+})();
+
+setTimeout(() => {
+  event.fire(1, 2, 3);
+}, 5000);
+
 
 
 // parentEvent.disconnectAllWithPriority(3)
 // parentEvent.fire();
 // childEvent.fire();
-parentEvent.fireAll();
+
+// (async () => {
+//   const results = await parentEvent.wait();
+// })()
 
 // show(testEvent);
 
