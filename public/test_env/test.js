@@ -5,19 +5,18 @@ const { Event } = require('../lib/event-maker');
 const show = obj => console.log(inspect(obj, {showHidden: false, depth: null, colors: true}));
 
 const parentEvent = Event();
-const childEvent = Event(parentEvent, { bubbling: true, dispatchLimit: 4, linkedEvents: [parentEvent] });
-childEvent.connectWithPriority(4, { handler: () => {} });
-childEvent.connect(() => console.log('event with prio 0'));
-childEvent._pausePriority = 6;
+const childEvent = Event(parentEvent, { bubbling: true, dispatchLimit: 4 });
 
-const cond = childEvent.validateNextDispatch({
-  ready: state => console.log('ready: ', state),
-  rejected: state => console.log('not ready: ', state)
-});
-
+childEvent.connect('name1', () => console.log('event with prio 0'));
+childEvent.connectWithPriority(3, { handler: () => console.log('event with prio 3') });
+childEvent.connectWithPriority(5, { handler: () => console.log('event with prio 5') });
 parentEvent.connect(() => console.log('parent event fired'));
 
-childEvent.fire();
+
+// parentEvent.disconnectAllWithPriority(3)
+// parentEvent.fire();
+// childEvent.fire();
+parentEvent.fireAll();
 
 // show(testEvent);
 

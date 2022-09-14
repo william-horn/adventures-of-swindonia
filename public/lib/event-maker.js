@@ -431,7 +431,9 @@ const disconnectWithPriority = function(priority, connectionData = {}) {
     @todo: maybe handle this differently in the future to allow disconnecting with 
     priority numbers that haven't been created yet?
   */
-  if (typeof priorityIndex === 'undefined') throw 'No such priority number exists';
+ // @todo: if using disconnectAllWithPriority, don't throw an exception because it has to be called recursively
+  // if (typeof priorityIndex === 'undefined') throw 'No such priority number exists';
+  if (typeof priorityIndex === 'undefined') return;
 
   /*
     @todo: we're checking to see if no arguments were passed every cycle of
@@ -466,6 +468,11 @@ const disconnectAll = function(...args) {
   recurse(this._childEvents, 'disconnectAll', ...args);
 }
 
+const disconnectAllWithPriority = function(...args) {
+  this.disconnectWithPriority(...args);
+  recurse(this._childEvents, 'disconnectAllWithPriority', ...args);
+}
+
 
 const pause = function(...args) {
   const [
@@ -473,14 +480,27 @@ const pause = function(...args) {
     handlerFunction, 
     connectionInstance
   ] = filterConnectionArgs(...args);
+
+  return this.pauseWithPriority(0, {
+    name: connectionName,
+    handler: handlerFunction,
+    connection: connectionInstance
+  });
 }
 
 /*
 
 */ 
 
-const pauseWithPriority = function(priority, connectionData) {
-  priority = getPriority(priority);
+const pauseWithPriority = function(priority, connectionData = {}) {
+  let _connectionPriorities, _cpo;
+  [
+    priority, 
+    connectionData, 
+    _connectionPriorities, 
+    _cpo
+  ] = filterPriorityConnectionArgs(priority, connectionData, this);
+
 }
 
 const resume = function() {
@@ -508,7 +528,7 @@ const isListening = function() {
       else if (state === 'noConnection') 
       else if (state === 'priorityPaused')
       else if (state === 'dispatchLimitReached')
-      
+
     }
   });
 */
@@ -516,7 +536,6 @@ const validateNextDispatch = function(caseHandler = {}) {
   const { 
     _connectionPriorityOrder: _cpo, 
     _pausePriority,
-    _state,
     settings: { dispatchLimit },
     stats: { 
       timeLastDispatched,
@@ -651,6 +670,7 @@ const Event = (parentEvent, settings) => {
     disconnect,
     disconnectWithPriority,
     disconnectAll,
+    disconnectAllWithPriority,
     pause,
     resume,
     validateNextDispatch,

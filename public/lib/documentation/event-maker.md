@@ -5,7 +5,6 @@ The `EventMaker` library was a side project developed by [William J. Horn](https
 
 ### **Important:** *documentation will probably be out of date during it's current peak developmental stages. Stay posted.*
 
-
 ## FAQ
 
 - Coming soon
@@ -26,40 +25,40 @@ import EventMaker from 'EventMaker';
 You may also destructure upon import
 ```js
 const {
-  event,
-  toggleEvent,
-  sequenceEvent
+  Event,
+  ...
 } = require('EventMaker');
 ```
 or with ES6
 ```js
 import {
-  event,
-  toggleEvent,
-  sequenceEvent
+  Event,
+  ...
 } from 'EventMaker';
 ```
 
 ## Event Instantiation
-An event can be spawned (instantiated) by simply calling the `event` constructor from the `EventMaker` library
+An event can be spawned (instantiated) by simply calling the `Event` constructor from inside the EventMaker module
 ```js
-const event = EventMaker.event();
+const event = EventMaker.Event();
 ```
 
-The `event` constructor takes two arguments; both are optional. Arguments listed in order:
+The `Event` constructor takes two arguments; both are optional. Arguments listed in order:
 - `parentEvent` **&lt;Event Instance>**
-  * Another event instance which will now contain the new instantiated event inside the `childEvents` field. Behavior affecting the parent event can ripple down to child and descendant events.
+  * Another event instance which will now contain the new instantiated event inside the `childEvents` field. Behavior affecting the parent event can ripple down to child and descendant events if you use `<methodName>All()` methods.
 
 * `settings` **&lt;Object>**
-  - The settings object contains all additional config data about the event and how it will behave. For now, there is only one field in the settings object that is configurable which is the `cooldown` property.
+  - The settings object contains all additional config data about the event and how it will behave.
 
 
-Here is a hierarchy of event instances using the `parentEvent` argument in the `event` constructor:
+Here is a hierarchy of event instances using the `parentEvent` argument in the `Event` constructor:
 
 ```js
-const grandparent = EventMaker.event();
-const parent = EventMaker.event(grandparent);
-const child = EventMaker.event(parent);
+const { Event } = require('EventMaker');
+
+const grandparent = Event();
+const parent = Event(grandparent);
+const child = Event(parent);
 ```
 Internally, the hierarchy looks something like this:
 ##
@@ -82,7 +81,9 @@ When an event is fired, only the connections made to that event will dispatch. T
 
 ## Connecting Events
 
-Events are only useful if they have connections. You can create a new event connection by calling the `connect` method on the event instance. 
+Events are only useful if they have connections. You can create a new event connection by calling the `connect` or `connectWithPriority` methods on the event instance. 
+
+> *Internally, `connect` calls the `connectWithPriority` function passing the arguments `0, { name, handler, connectionInstance }`. If you don't need to worry about connection priorities you can just use `connect`.*
 
 The `connect` method takes up to two arguments; one is optional. Arguments listed in order:
 
@@ -97,7 +98,7 @@ The `connect` method takes up to two arguments; one is optional. Arguments liste
 Below are some examples of creating event connections using a variation of arguments:
 
 ```js
-const event = EventMaker.event();
+const event = Event();
 
 const eventHandler = function() {
   console.log('event was fired!');
@@ -128,7 +129,7 @@ For now we will just focus on the `fire` method, as this is the core function be
 > *Behind the scenes, `fireAll` is just a recursive call to `fire` for all descendant events*
 ```js
 // create event instance
-const event = EventMaker.event();
+const event = Event();
 
 // create event connection
 event.connect( () => console.log('event fired!') );
@@ -171,7 +172,15 @@ event.fire();
 
 ## Disconnecting Events
 
-If you no longer need an event connection then you may disconnect it from the event instance by using the `disconnect` or `disconnectAll` methods. You can disconnect event connections by name, handler function, or by the connection instance returned from the `connect` method.
+If you no longer need an event connection then you may disconnect it from the event instance by using the following methods:
+  * `disconnect`
+  * `disconnectAll` 
+  * `disconnectWithPriority`
+  * `disconnectAllWithPriority`
+  
+  You can disconnect event connections by name, handler function, or by the connection instance returned from the `connect` and `connectWithPriority` method.
+
+  > *Internally, the `disconnect` method calls `disconnectWithPriority` with a default priority of `0`* 
 
 The `disconnect` method takes up to three arguments; all of them are optional. Arguments listed:
 
@@ -186,9 +195,9 @@ The `disconnect` method takes up to three arguments; all of them are optional. A
   - The connection object returned from the `connect` method
 
 
-If no arguments are passed to `disconnect`, then **all** connections will be disconnected from the event instance.
+If no arguments are passed to `disconnect`, then **all** connections with `priority: 0` will be disconnected from the event instance.
 ```js
-const event = EventMaker.event();
+const event = Event();
 
 event.connect( () => console.log('connection #1 fired!') );
 event.connect( () => console.log('connection #2 fired!') );
@@ -199,7 +208,7 @@ event.fire();
 ##
     =>  <Empty>
 
-If you pass the `connectionInstance` as an argument, then the other two argument are not necessary. This is because connection instances have a one-to-one relationship with event connections; meaning there will only ever be one event connection associated with a connection instance.
+If you pass the `connectionInstance` as an argument, then the other two arguments are not necessary. This is because connection instances have a one-to-one relationship with event connections; meaning there will only ever be one event connection associated with a connection instance.
 
 ```js
 event.connect( () => console.log('connection #1 fired!') );
@@ -211,7 +220,7 @@ event.fire();
 ##
     =>  connection #1 fired!
 
-If you pass the `connectionName` or `handlerFunction` arguments then you may pass them individually, at the same time, and in any order.
+If you pass the `connectionName` or `handlerFunction` arguments then you may pass them individually (or at the same time) in any order.
 
 Setup:
 ```js
@@ -263,12 +272,12 @@ event.fire();
 
 The `disconnectAll` method (similar to the internal behavior of `fireAll`) will recursively call `disconnect` on all descendant events.
 
-This method takes the same arguments as `disconnect`. If no arguments are passed to `disconnectAll`, then **all** connections attached to the event instance and all of it's descendant events will be disconnected.
+This method takes the same arguments as `disconnect`. If no arguments are passed to `disconnectAll`, then **all** connections with `priority: 0` will be disconnected from the event instance and all of it's descendant events.
 
 Here is a demonstration:
 ```js
-const parentEvent = EventMaker.event();
-const childEvent = EventMaker.event(parentEvent);
+const parentEvent = Event();
+const childEvent = Event(parentEvent);
 
 parentEvent.connect( () => console.log('parent event #1') );
 childEvent.connect( () => console.log('child event #1') );
@@ -300,6 +309,7 @@ parentEvent.fireAll();
 ##
     =>  parent event #1
         child event #2
+
 
 > *Since we created a hierarchy with `childEvent` and `parentEvent`, doing:*
 ```js
