@@ -12,12 +12,15 @@
 EventMaker was built from scratch by William J. Horn with yet another desperate attempt to re-invent the wheel 
 just "because". On a real note though, this is a pretty neat and efficient implementation of custom event handling. 
 
-This library lets you manage:
+Some features include:
 
   * Event bubbling
   * Event toggling
+  * Dispatch validation
   * Creating event sequences (coming soon)
-  * and more
+  * Creating event priorities
+  * Built-in cooldown/interval handling in options
+  * more coming soon
 
 Documentation can be found here: https://github.com/william-horn/adventures-of-swindonia/blob/develop/public/lib/documentation/event-maker.md
 
@@ -72,7 +75,7 @@ const EventEnums = {
   InstanceType: {
     EventConnection: 'EventConnection',
     EventInstance: 'EventInstance'
-  }
+  },
 }
 
 const getPriority = (priority, disableException) => {
@@ -97,6 +100,15 @@ const filterConnectionArgs = (connectionName, handlerFunction) => {
     { rule: [handlerFunction, 'function'] },
     { rule: [undefined, EventEnums.InstanceType.EventConnection] }
   ]);
+}
+
+const filterPriorityConnectionArgs = (priority, connectionData, event) => {
+  const { _connectionPriorities, _connectionPriorityOrder: _cpo } = event;
+
+  return [...modelArgs_beta([
+    { rule: [priority, 'number', {string: getPriority(priority, true)}], default: 1},
+    { rule: [connectionData, 'object']}
+  ]), _connectionPriorities, _cpo];
 }
 
 
@@ -130,7 +142,8 @@ const dispatchEvent = function(payload, ...args) {
     _connectionPriorities,
     _connectionPriorityOrder: _cpo,
     _pausePriority,
-    settings: { linkedEvents }
+    settings: { linkedEvents },
+    stats
   } = event;
 
   const _signature = {
@@ -138,11 +151,12 @@ const dispatchEvent = function(payload, ...args) {
     ...signature
   }
 
-  if (!event.validateDispatch()) {
+  if (!event.validateNextDispatch()) {
     return;
   }
 
   caller._propagating = true;
+  stats.dispatchCount++;
 
   for (let i = _cpo.length - 1; i > _pausePriority; i--) {
     const connectionRow = _connectionPriorities[_cpo[i]];
@@ -180,7 +194,8 @@ const dispatchEvent = function(payload, ...args) {
 
   // not necessary to set _propagating back to false but helps for readability in the console
   // _propagating will remain true if continuePropagation is enabled and a parent event exists
-  caller._propagating = Boolean(_signature.continuePropagation) && event._parentEvent;
+  // todo: reduce logic here for computing _propagating state
+  caller._propagating = (_signature.continuePropagation && event._parentEvent) || true;
 }
 
 
@@ -213,16 +228,18 @@ const connect = function(name, handler) {
 
 
 const connectWithPriority = function(priority, connectionData) {
-  [priority, connectionData] = modelArgs_beta([
-    { rule: [priority, 'number', {string: getPriority(priority, true)}], default: 1},
-    { rule: [connectionData, 'object']}
-  ]);
+  let _connectionPriorities, _cpo;
+  [
+    priority, 
+    connectionData, 
+    _connectionPriorities, 
+    _cpo
+  ] = filterPriorityConnectionArgs(priority, connectionData, this);
 
   if (!connectionData) throw 'connect method requires connection data';
-  const { _connectionPriorities, _connectionPriorityOrder: _cpo } = this;
 
   /*
-    connectionRow = {orderIndex: 0, connections: [...]}
+    connectionRow = {orderIndex: number, connections: ConnectionInstance[]}
   */
   let connectionRow = _connectionPriorities[priority];
   let connectionList;
@@ -363,13 +380,18 @@ const disconnect = function(...args) {
   return this.disconnectWithPriority(0, { 
     name: connectionName, 
     handler: handlerFunction, 
-    connectionInstance: connectionInstance 
+    connection: connectionInstance 
   })
 }
 
 const disconnectWithPriority = function(priority, connectionData = {}) {
-  priority = getPriority(priority);
-  const { _connectionPriorities, _connectionPriorityOrder: _cpo } = this;
+  let _connectionPriorities, _cpo;
+  [
+    priority, 
+    connectionData, 
+    _connectionPriorities, 
+    _cpo
+  ] = filterPriorityConnectionArgs(priority, connectionData, this);
 
   /*
     special case: if connection object is passed instead of a name or handler function
@@ -378,7 +400,7 @@ const disconnectWithPriority = function(priority, connectionData = {}) {
   const {
     name: connectionName,
     handler: handlerFunction,
-    connectionInstance
+    connection: connectionInstance
   } = connectionData;
 
   if (connectionInstance) {
@@ -409,7 +431,7 @@ const disconnectWithPriority = function(priority, connectionData = {}) {
     @todo: maybe handle this differently in the future to allow disconnecting with 
     priority numbers that haven't been created yet?
   */
-  if (!priorityIndex) throw 'No such priority number exists';
+  if (typeof priorityIndex === 'undefined') throw 'No such priority number exists';
 
   /*
     @todo: we're checking to see if no arguments were passed every cycle of
@@ -475,15 +497,22 @@ const isListening = function() {
 
 
 /*
-  validateDispatch({ 
-    isDisabled: () => if event is disabled
-    noConnection: () => no connections exist
-    dispatchLimitReached: () => event dispatch limit is reached,
-    isListening: () => event is listening,
-    hasPriorityDiff: () => event is paused but has available connections of higher priority
+  validateNextDispatch({ 
+    ready: (state) => {
+      if (state === 'allListening')
+      else if (state === 'priorityListening') 
+    },
+
+    rejected: (state) => {
+      if (state === 'isDisabled')
+      else if (state === 'noConnection') 
+      else if (state === 'priorityPaused')
+      else if (state === 'dispatchLimitReached')
+      
+    }
   });
 */
-const validateDispatch = function(caseHandler = {}) {
+const validateNextDispatch = function(caseHandler = {}) {
   const { 
     _connectionPriorityOrder: _cpo, 
     _pausePriority,
@@ -497,10 +526,8 @@ const validateDispatch = function(caseHandler = {}) {
 
   const highestPriority = _cpo[_cpo.length - 1];
 
-  const handleCase = (cause, ...args) => {
-    if (caseHandler[cause]) {
-      caseHandler[cause](...args);
-    }
+  const sendStatus = (status, ...args) => {
+    if (caseHandler[status]) caseHandler[status](...args)
   }
 
   /*
@@ -509,35 +536,41 @@ const validateDispatch = function(caseHandler = {}) {
 
   // event has been disabled
   if (!this.isEnabled()) {
-    handleCase('isDisabled');
+    sendStatus('rejected', 'isDisabled');
     return false;
   }
 
   // connections list is empty; no connections exist
   if (_cpo.length === 0) {
-    handleCase('noConnection');
+    sendStatus('rejected', 'noConnection');
+    return false;
+  }
+
+  // all connections are paused
+  if (_pausePriority >= highestPriority) {
+    sendStatus('rejected', 'priorityPaused');
     return false;
   }
 
   // event exceeded dispatch limit set by user
-  if (dispatchCount >= dispatchLimit) {
-    handleCase('dispatchLimitReached');
+  if (dispatchCount > dispatchLimit) {
+    sendStatus('rejected', 'dispatchLimitReached');
     return false;
   }
 
   // event is in listening state
   if (this.isListening()) {
-    handleCase('isListening');
+    sendStatus('ready', 'allListening');
     return true;
   }
   
   // event state is paused but higher connection priorities exist
   if (highestPriority > _pausePriority) {
-    handleCase('hasPriorityDiff');
+    sendStatus('ready', 'priorityListening');
     return true;
   }
 
-  // todo: possibly reduce logic further in the future
+  // @todo: possibly reduce logic further in the future
   // return _cpo.length > 0 && this.isEnabled()
   //   && ((highestPriority > _pausePriority) || _state === 'listening');
 }
@@ -620,7 +653,7 @@ const Event = (parentEvent, settings) => {
     disconnectAll,
     pause,
     resume,
-    validateDispatch,
+    validateNextDispatch,
     isEnabled,
     isListening,
     stopPropagating
