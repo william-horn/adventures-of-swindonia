@@ -1,8 +1,9 @@
-const {modelArgs, modelArgs_beta} = require('../../lib/helpers');
+const {modelArgs, modelArgs_beta, objectValuesAreUndefined} = require('../../lib/helpers');
 const inspect = require('util').inspect;
 const { Event } = require('../lib/event-maker');
 
-// const show = obj => console.log(inspect(obj, {showHidden: false, depth: null, colors: true}));
+const show = obj => console.log(inspect(obj, {showHidden: false, depth: null, colors: true}));
+
 
 // const parentEvent = Event();
 // const childEvent = Event(parentEvent, { bubbling: true, dispatchLimit: 4 });
@@ -14,25 +15,31 @@ const { Event } = require('../lib/event-maker');
 
 
 const event = Event();
+const handler = () => console.log('event handler fired');
 
-event.connect(() => console.log('event fired'));
-
-(async () => {
-  console.log('waiting for event...');
-  try {
-    const results = await event.wait(3);
-    console.log('results: ', results);
-    console.log('event waiting stopped');
-  } catch(err) {
-    console.log(err);
-  }
-})();
-
-setTimeout(() => {
-  event.fire(1, 2, 3);
-}, 5000);
+event.connect('frank', handler);
+const c = event.connect(() => console.log('event fired 2'));
+event.disconnectWithPriority(0, { name: 'frank' });
+event.fire();
 
 
+// (async () => {
+//   console.log('waiting for event...');
+//   try {
+//     const results = await event.wait(6);
+//     console.log('results: ', results);
+//     console.log('event waiting stopped');
+//   } catch(err) {
+//     console.log(err);
+//   }
+// })();
+
+// setTimeout(() => {
+//   event.fire(1, 2, 3);
+// }, 2000);
+
+// event.fire(1,2,3);
+// show(event);
 
 // parentEvent.disconnectAllWithPriority(3)
 // parentEvent.fire();
@@ -60,5 +67,18 @@ setTimeout(() => {
 
 //   console.log(a, b, c, d, e);
 // }
+
+// const func1 = (...args) => {
+//   [a, b, c, d, e] = modelArgs_beta([
+//     {rule: ['string']},
+//     {rule: ['string']},
+//     {rule: ['boolean', {string: 677}], default: 'asd'},
+//     {rule: ['string']},
+//     {rule: ['number']}
+//   ], ...args);
+
+//   console.log(a, b, c, d, e);
+// }
+
 
 // func1('str1', 500, 'str2', 1, 'str3'); // str, str, boolean, str, num

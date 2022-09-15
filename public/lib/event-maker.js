@@ -40,6 +40,7 @@ Documentation can be found here: https://github.com/william-horn/adventures-of-s
 ==================================================================================================================================
 
 todo: add event yielding (promise-based awaiting for event dispatches)
+  * DONE - 09/14/2022
 todo: create constructor for event sequences (events for sequential event dispatches, like key combinations)
 todo: implement pause/resume mechanic for events
 todo: implement event connection strength/priorities
@@ -56,7 +57,8 @@ const {
   modelArgs_beta,
   objectMeetsCriteria,
   toUpperCamelCase,
-  isEmpty
+  objectHasNoKeys,
+  objectValuesAreUndefined
 } = require('../../lib/helpers');
 
 const EventEnums = {
@@ -76,6 +78,11 @@ const EventEnums = {
     EventConnection: 'EventConnection',
     EventInstance: 'EventInstance'
   },
+
+  // ConnectionFilters: {
+  //   Name: 'name',
+  //   Handler: 'handler',
+  // }
 }
 
 const getPriority = (priority, disableException) => {
@@ -88,27 +95,57 @@ const getPriority = (priority, disableException) => {
   return _priority;
 }
 
+const isConnectionType = connection => {
+  return typeof connection === 'object' 
+    && connection._customType === EventEnums.InstanceType.EventConnection;
+}
+
 const recurse = (list, method, ...args) => {
   for (let i = 0; i < list.length; i++) {
     list[i][method](...args);
   }
 }
 
-const filterConnectionArgs = (connectionName, handlerFunction) => {
-  return modelArgs_beta([
-    { rule: [connectionName, 'string'] },
-    { rule: [handlerFunction, 'function'] },
-    { rule: [undefined, EventEnums.InstanceType.EventConnection] }
-  ]);
+/*
+  find connection list and connection index of a given connection
+*/
+const findConnectionInstance = (connection, _connectionPriorities) => {
+  if (connection) {
+    const connectionList = _connectionPriorities[connection._priority].connections;
+
+    return { 
+      list: connectionList, 
+      index: connectionList.findIndex(conn => conn === connection)
+    };
+  }
+
+  return false;
 }
 
-const filterPriorityConnectionArgs = (priority, connectionData, event) => {
-  const { _connectionPriorities, _connectionPriorityOrder: _cpo } = event;
+const connectionPassesFilter = (connection, connectionFilter) => {
+  return objectMeetsCriteria(connection, [
+    { key: 'name', equals: connectionFilter.name, ignoreUndefined: true },
+    { key: 'handler', equals: connectionFilter.handler, ignoreUndefined: true },
+  ]); 
+}
 
-  return [...modelArgs_beta([
-    { rule: [priority, 'number', {string: getPriority(priority, true)}], default: 1},
-    { rule: [connectionData, 'object']}
-  ]), _connectionPriorities, _cpo];
+const arrangeConnectionFilterArgs = connectFilter => {
+  [
+    connectFilter.name,
+    connectFilter.handler,
+    connectFilter.connection
+  ] = modelArgs_beta([
+    { rule: ['string'] }, 
+    { rule: ['function'] }, 
+    { rule: [EventEnums.InstanceType.EventConnection] }
+  ], ...Object.values(connectFilter)); // ...args: name, handler, connection
+}
+
+const getPriorityHandlerArgs = function(priority, connectionFilter) {
+  return modelArgs_beta([
+    { rule: ['number', {string: getPriority(priority, true)}], default: 1},
+    { rule: ['object'], default: {}}
+  ], priority, connectionFilter);
 }
 
 
@@ -171,7 +208,12 @@ const dispatchEvent = function(payload, ...args) {
 
   // fire all wait resolvers
   for (let i = 0; i < _resolvers.length; i++) {
-    _resolvers[i]([...args]);
+    const [resolver, timeoutId] = _resolvers[i];
+
+    if (timeoutId) clearInterval(timeoutId);
+
+    resolver([...args]);
+    _resolvers.splice(i, 1);
   }
 
   if (linkedEvents.length > 0) {
@@ -223,26 +265,23 @@ const dispatchEvent = function(payload, ...args) {
 
   @returns connectionInstance<object>
 */
-const connect = function(name, handler) {
-  [name, handler] = modelArgs_beta([
-    { rule: [name, 'string'] },
-    { rule: [handler, 'function', {string: () => name}] }
-  ]);
+const connect = function(...args) {
+  const [name, handler] = modelArgs_beta([
+    { rule: ['string'] },
+    { rule: ['function', {string: () => name}] }
+  ], ...args);
 
-  return this.connectWithPriority(0, { name, handler });
+  return this.connectWithPriority(0, { 
+    name, 
+    handler 
+  });
 }
 
-
 const connectWithPriority = function(priority, connectionData) {
-  let _connectionPriorities, _cpo;
-  [
-    priority, 
-    connectionData, 
-    _connectionPriorities, 
-    _cpo
-  ] = filterPriorityConnectionArgs(priority, connectionData, this);
-
-  if (!connectionData) throw 'connect method requires connection data';
+  [priority, connectionData] = getPriorityHandlerArgs(priority, connectionData);
+  const { _connectionPriorities, _connectionPriorityOrder: _cpo } = this;
+  
+  if (!connectionData) throw 'Connect method requires connection data';
 
   /*
     connectionRow = {orderIndex: number, connections: ConnectionInstance[]}
@@ -375,60 +414,27 @@ const fireAll = function(...args) {
 
 /*
   ...args<connectionName<string>|connectionInstance<object>, handlerFunction<function>>
+  @todo: come back and see if we can shorten the params to ...args
 */
-const disconnect = function(...args) {
-  const [
-    connectionName, 
-    handlerFunction, 
-    connectionInstance
-  ] = filterConnectionArgs(...args);
-
-  return this.disconnectWithPriority(0, { 
-    name: connectionName, 
-    handler: handlerFunction, 
-    connection: connectionInstance 
-  })
+const disconnect = function(name, handler) {
+  return this.disconnectWithPriority(0, { name, handler })
 }
 
-const disconnectWithPriority = function(priority, connectionData = {}) {
-  let _connectionPriorities, _cpo;
-  [
-    priority, 
-    connectionData, 
-    _connectionPriorities, 
-    _cpo
-  ] = filterPriorityConnectionArgs(priority, connectionData, this);
+const disconnectWithPriority = function(priority, connectionFilter) {
+  const disconnectOverride = !connectionFilter;
 
-  /*
-    special case: if connection object is passed instead of a name or handler function
-    then disconnect the connection instance
-  */
-  const {
-    name: connectionName,
-    handler: handlerFunction,
-    connection: connectionInstance
-  } = connectionData;
+  [priority, connectionFilter] = getPriorityHandlerArgs(priority, connectionFilter);
+  arrangeConnectionFilterArgs(connectionFilter);
 
-  if (connectionInstance) {
-    const connectionList = this._connectionPriorities[connectionInstance._priority].connections;
-    /*
-      @todo: look into alternative method for removing connection instances.
-      `splice` combined with `findIndex` makes this somewhat costly.
-    */
-    connectionList.splice(
-      connectionList.findIndex(conn => conn === connectionInstance),
-      1
-    );
+  const { _connectionPriorities, _connectionPriorityOrder: _cpo } = this;
 
+  // console.log('disconnectWithPriority args: ', priority, connectionFilter);
+  // console.log('disconnect CONNECTION DATA: ', priority, connectionFilter);
+
+  const connectionInstanceData = findConnectionInstance(connectionFilter.connection, _connectionPriorities);
+  if (connectionInstanceData) {
+    connectionInstanceData.list.splice(connectionInstanceData.index, 1);
     return;
-  }
-
-  // disconnect based on connection name or handler function criteria
-  const isEligibleForDisconnect = connection => {
-    return objectMeetsCriteria(connection, [
-      { key: 'name', equals: connectionName, ignoreUndefined: true },
-      { key: 'handler', equals: handlerFunction, ignoreUndefined: true },
-    ]); 
   }
 
   const priorityIndex = _connectionPriorities[priority]?.orderIndex;
@@ -436,23 +442,28 @@ const disconnectWithPriority = function(priority, connectionData = {}) {
   /* 
     @todo: maybe handle this differently in the future to allow disconnecting with 
     priority numbers that haven't been created yet?
+
+    @todo: if using disconnectAllWithPriority, don't throw an exception because it has to be called recursively.
+    otherwise, maybe throw exception.
   */
- // @todo: if using disconnectAllWithPriority, don't throw an exception because it has to be called recursively
   // if (typeof priorityIndex === 'undefined') throw 'No such priority number exists';
   if (typeof priorityIndex === 'undefined') return;
 
   /*
     @todo: we're checking to see if no arguments were passed every cycle of
-    the for loop for disconnection (isEmpty(connectioNData)). Maybe add separate 
+    the for loop for disconnection (objectHasNoKeys(connectionFilter)). Maybe add separate 
     condition if no arguments were passed, then disconnect all without checking?
   */
+  const filterIsPopulated = !objectValuesAreUndefined(connectionFilter);
+
   for (let i = 0; i <= priorityIndex; i++) {
     const connectionRow = _connectionPriorities[_cpo[i]];
     const connectionList = connectionRow.connections;
 
     for (let j = connectionList.length - 1; j >= 0; j--) {
       const connection = connectionList[j];
-      if (isEmpty(connectionData) || isEligibleForDisconnect(connection)) {
+      if (disconnectOverride || filterIsPopulated && connectionPassesFilter(connection, connectionFilter)) {
+        // console.log('disconnectOverride: ', disconnectOverride, ' | passed filter: ', connectionPassesFilter(connection, connectionFilter));
         connectionList.splice(j, 1);
       }
     }
@@ -481,44 +492,39 @@ const disconnectAllWithPriority = function(...args) {
 
 const wait = function(timeout) {
   return new Promise((resolve, reject) => {
-    this._resolvers.push(resolve);
+    const resolver = [resolve];
+
     if (timeout !== undefined) {
-      setTimeout(() => reject('Event timed out'), timeout*1000);
+      resolver[1] = setTimeout(
+        () => reject('Event timed out'), 
+        timeout*1000
+      );
     }
+
+    this._resolvers.push(resolver);
   });
 }
 
 
 const pause = function(...args) {
-  const [
-    connectionName, 
-    handlerFunction, 
-    connectionInstance
-  ] = filterConnectionArgs(...args);
+  const [name, handler, connection] = getConnectionFilterArgs(...args);
 
   return this.pauseWithPriority(0, {
-    name: connectionName,
-    handler: handlerFunction,
-    connection: connectionInstance
+    name,
+    handler,
+    connection
   });
 }
 
-/*
-
-*/ 
-
-const pauseWithPriority = function(priority, connectionData = {}) {
-  let _connectionPriorities, _cpo;
-  [
-    priority, 
-    connectionData, 
-    _connectionPriorities, 
-    _cpo
-  ] = filterPriorityConnectionArgs(priority, connectionData, this);
-
+const pauseAll = function(...args) {
+  this.pause(...args);
+  recurse(this._childEvents, 'pauseAll', ...args);
 }
 
-const pauseAll = function() {
+const pauseWithPriority = function(priority, connectionFilter = {}) {
+  [priority, connectionFilter] = getPriorityHandlerArgs(priority, connectionFilter);
+  const { _connectionPriorities, _connectionPriorityOrder: _cpo } = this;
+
 
 }
 
@@ -549,7 +555,6 @@ const isEnabled = function() {
 const isListening = function() {
   return this._pausePriority === -1;
 }
-
 
 /*
   validateNextDispatch({ 
@@ -623,10 +628,6 @@ const validateNextDispatch = function(caseHandler = {}) {
     sendStatus('ready', 'priorityListening');
     return true;
   }
-
-  // @todo: possibly reduce logic further in the future
-  // return _cpo.length > 0 && this.isEnabled()
-  //   && ((highestPriority > _pausePriority) || _state === 'listening');
 }
 
 /*
@@ -731,6 +732,7 @@ const Event = (parentEvent, settings) => {
 module.exports = {
   Event,
   EventEnums,
-  getPriority
+  getPriority,
+  isConnectionType
 }
 
