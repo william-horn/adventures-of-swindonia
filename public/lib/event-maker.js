@@ -62,6 +62,8 @@ const {
   getSubsetOfObject
 } = require('../../lib/helpers');
 
+const { v4: uuidv4 } = require('uuid');
+
 // @todo: create a separate file for enum values
 const EventEnums = {
   ConnectionPriority: {
@@ -96,8 +98,7 @@ const EventEnums = {
     LinkedEvents: 1,
     DescendantEvents: 2,
     AscendantEvents: 3
-  }
-
+  },
 }
 
 const getPriority = (priority, disableException) => {
@@ -181,33 +182,18 @@ const getPriorityHandlerArgs = function(priority, connectionFilter) {
       
   @returns <void>
 */
-const recurseUpstream = () => {
-
-}
-
-const recurseDownstream = () => {
-
-}
 
 const onDispatchReady = (dispatchStatus, payload, globalContext) => {
-  console.log('running dispatch with status: ', dispatchStatus);
-
-  const DispatchOrder = EventEnums.DispatchOrder;
   const DispatchStatus = EventEnums.DispatchStatus;
 
   const {
-    _dispatchEvent,
-    eventBlacklist,
+    eventBlacklist
   } = globalContext;
 
   const {
     event,
-    args,
-    _headers = {
-      // fireDescendants
-      // ignoreLinkedEvents
-      // dispatchOrder: ['self', 'linked', 'trickle', 'bubble']
-    },
+    args = [],
+    headers: _headers = {},
   } = payload;
 
   const {
@@ -216,7 +202,6 @@ const onDispatchReady = (dispatchStatus, payload, globalContext) => {
     _pausePriority,
     _resolvers,
     settings: eventSettings,
-    settings: { linkedEvents },
     stats
   } = event;
 
@@ -225,6 +210,11 @@ const onDispatchReady = (dispatchStatus, payload, globalContext) => {
     ...eventSettings,
     ..._headers
   }
+
+  const {
+    linkedEvents,
+    dispatchOrder
+  } = headers;
 
   stats.dispatchCount++;
   event._propagating = true;
@@ -238,7 +228,7 @@ const onDispatchReady = (dispatchStatus, payload, globalContext) => {
 
         for (let j = 0; j < connectionList.length; j++) {
           const connection = connectionList[j];
-          connection.handler(event, ...args);
+          connection.handler(globalContext.catalyst, ...args);
         }
       }
     }
@@ -249,7 +239,7 @@ const onDispatchReady = (dispatchStatus, payload, globalContext) => {
 
       if (timeoutId) clearInterval(timeoutId);
 
-      resolver([...args]);
+      resolver(args);
       _resolvers.splice(i, 1);
     }
   }
@@ -259,27 +249,31 @@ const onDispatchReady = (dispatchStatus, payload, globalContext) => {
     if (linkedEvents.length > 0 && !headers.ignoreLinkedEvents) {
       for (let i = 0; i < linkedEvents.length; i++) {
         const linkedEvent = linkedEvents[i];
-        dispatchEvent({
+
+        if (eventBlacklist[linkedEvent._id]) {
+          console.log('Cyclic linked events');
+          return;
+        }
+
+        eventBlacklist[linkedEvent._id] = true;
+
+        globalContext._dispatchEvent({
           event: linkedEvent,
-          args,
-          extensions: { 
-            // continuePropagation: doesn't set _propagating to false after firing other branched events
-            continuePropagation: true,
-            // bubbling: linkedEvent.settings.bubbling
-          }
+          args
         });
+
+        delete eventBlacklist[linkedEvent._id]
       }
     }
   }
 
   const runDescendantEventHandlers = () => {
-
+    // console.log('ran descendant events');
   }
 
   const runAscendantEventHandlers = () => {
-
+    // console.log('ran ascendant events');
   }
-
 
   const dispatchSequence = [
     runEventHandlers, 
@@ -288,32 +282,18 @@ const onDispatchReady = (dispatchStatus, payload, globalContext) => {
     runAscendantEventHandlers
   ]
 
-  for (let i = 0; i < 
-
+  for (let i = 0; i < dispatchOrder.length; i++) {
+    dispatchSequence[i]();
+  }
 }
 
 const onDispatchRejected = dispatchStatus => {
   console.log('dispatch failed: ', dispatchStatus);
 }
 
-
-/*
-  dispatchEvent({
-    event,
-    args: ['a', 'b', 'c'],
-    headers: {
-      ghost: true,
-      bubbling: true,
-      ignoreLinkedEvents: true,
-      trickle: true
-      dispatchOrder: ['self', 'linked', 'trickle', 'bubble'],
-    }
-  });
-*/
-
 const dispatchEvent = function(payload) {
   const globalContext = {
-    eventBlacklist: {},
+    eventBlacklist: { [payload.event._id]: true },
     catalyst: payload.event,
     headers: payload.headers,
 
@@ -327,7 +307,6 @@ const dispatchEvent = function(payload) {
 
   globalContext._dispatchEvent(payload);
 }
-
 
 
 /*
@@ -443,8 +422,8 @@ const stopPropagating = function() {
 const fire = function(...args) {
   dispatchEvent({
     event: this,
-    caller: this
-  }, ...args);
+    args: [...args]
+  });
 }
 
 /*
@@ -653,23 +632,6 @@ const unsetGhost = function() {
 }
 
 /*
-  validateNextDispatch({ 
-    ready: (state) => {
-      if (state === 'allListening')
-      else if (state === 'priorityListening') 
-    },
-
-    rejected: (state) => {
-      if (state === 'isDisabled')
-      else if (state === 'noConnection') 
-      else if (state === 'priorityPaused')
-      else if (state === 'dispatchLimitReached')
-
-    }
-  });
-
-  new:
-
   func(status, ...args) {
 
   }
@@ -768,6 +730,7 @@ const validateNextDispatch = function(caseHandler = {}) {
   @returns event<EventInstance>
 */
 const Event = (parentEvent, settings) => {
+  const DispatchOrder = EventEnums.DispatchOrder;
 
   [parentEvent, settings] = modelArgs_beta([
     { rule: [parentEvent, EventEnums.InstanceType.EventInstance] },
@@ -775,9 +738,6 @@ const Event = (parentEvent, settings) => {
   ]);
 
   const event = {
-    // event fields
-    _customType: EventEnums.InstanceType.EventInstance,
-    _parentEvent: parentEvent,
     /* 
       _connectionPriorityOrder: [0, 3, 5]
       _connectionPriorities: { 
@@ -785,8 +745,11 @@ const Event = (parentEvent, settings) => {
         ['0']: {orderIndex: 0, connections: []},
         ['3']: {orderIndex: 1, connections: []},
       }
-
     */
+
+    _id: uuidv4(),
+    _customType: EventEnums.InstanceType.EventInstance,
+    _parentEvent: parentEvent,
     _connectionPriorityOrder: [],
     _connectionPriorities: {},
     _childEvents: [],

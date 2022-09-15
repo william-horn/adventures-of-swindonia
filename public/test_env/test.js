@@ -5,15 +5,26 @@ const { Event, EventEnums, dispatchEvent } = require('../lib/event-maker');
 const show = obj => console.log(inspect(obj, {showHidden: false, depth: null, colors: true}));
 
 const parent = Event();
-const event = Event(parent);
+const event2 = Event({ linkedEvents: [parent] });
+const event = Event({ linkedEvents: [event2] });
 
 parent.connect(() => console.log('parent fired'));
+event2.connect(() => console.log('fired event 2'));
 event.connect(() => console.log('fired event 1'));
 
+// event.fire();
+
 dispatchEvent({
-  event,
-  args: ['a', 'b', 'c'],
-  /*
+  event: parent,
+  headers: {
+    linkedEvents: [event, event2]
+  }
+});
+
+/*
+  dispatchEvent({
+    event,
+    args: ['a', 'b', 'c'],
     headers: {
       ghost: true,
       bubbling: true,
@@ -21,13 +32,8 @@ dispatchEvent({
       trickle: true
       dispatchOrder: ['self', 'linked', 'trickle', 'bubble'],
     }
-  */
-  extensions: {
-    // ghost: true,
-    // bubbling: true
-  },
-});
-
+  });
+*/
 // const greatGrandparentEvent = Event();
 // const grandParentEvent = Event(greatGrandparentEvent, { grandparent: true });
 // const parentEvent = Event(grandParentEvent, { bubbling: true, dispatchLimit: 500, x: 9 });

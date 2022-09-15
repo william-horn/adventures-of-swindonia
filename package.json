@@ -16,5 +16,8 @@
   "devDependencies": {
     "browserify": "^17.0.0",
     "concurrently": "^7.4.0"
+  },
+  "dependencies": {
+    "uuid": "^9.0.0"
   }
 }
