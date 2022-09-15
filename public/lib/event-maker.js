@@ -89,6 +89,13 @@ const EventEnums = {
     DispatchLimitReached: 'DispatchLimitReached',
     AllListening: 'AllListening',
     PriorityListening: 'PriorityListening'
+  },
+
+  DispatchOrder: {
+    Catalyst: 0,
+    LinkedEvents: 1,
+    DescendantEvents: 2,
+    AscendantEvents: 3
   }
 
 }
@@ -182,8 +189,16 @@ const recurseDownstream = () => {
 
 }
 
-const onDispatchReady = payload => {
+const onDispatchReady = (dispatchStatus, payload, globalContext) => {
+  console.log('running dispatch with status: ', dispatchStatus);
+
+  const DispatchOrder = EventEnums.DispatchOrder;
   const DispatchStatus = EventEnums.DispatchStatus;
+
+  const {
+    _dispatchEvent,
+    eventBlacklist,
+  } = globalContext;
 
   const {
     event,
@@ -207,18 +222,15 @@ const onDispatchReady = payload => {
 
   // list of temporary settings for event
   const headers = {
-    dispatchOrder: [],
     ...eventSettings,
     ..._headers
   }
 
-  return dispatchStatus => {
-    stats.dispatchCount++;
-    event._propagating = true;
+  stats.dispatchCount++;
+  event._propagating = true;
 
-    console.log('running dispatch with status: ', dispatchStatus);
-
-    // SELF DISPATCH TYPE
+  // SELF DISPATCH TYPE
+  const runEventHandlers = () => {
     if (!headers.ghost) {
       for (let i = _cpo.length - 1; i > _pausePriority; i--) {
         const connectionRow = _connectionPriorities[_cpo[i]];
@@ -240,8 +252,10 @@ const onDispatchReady = payload => {
       resolver([...args]);
       _resolvers.splice(i, 1);
     }
+  }
 
-    // LINKED DISPATCH TYPE
+  // LINKED DISPATCH TYPE
+  const runLinkedEventHandlers = () => {
     if (linkedEvents.length > 0 && !headers.ignoreLinkedEvents) {
       for (let i = 0; i < linkedEvents.length; i++) {
         const linkedEvent = linkedEvents[i];
@@ -257,19 +271,61 @@ const onDispatchReady = payload => {
       }
     }
   }
+
+  const runDescendantEventHandlers = () => {
+
+  }
+
+  const runAscendantEventHandlers = () => {
+
+  }
+
+
+  const dispatchSequence = [
+    runEventHandlers, 
+    runLinkedEventHandlers, 
+    runDescendantEventHandlers, 
+    runAscendantEventHandlers
+  ]
+
+  for (let i = 0; i < 
+
 }
 
-const onDispatchRejected = payload => {
-  return dispatchStatus => {
-    console.log('dispatch failed: ', dispatchStatus);
-  }
+const onDispatchRejected = dispatchStatus => {
+  console.log('dispatch failed: ', dispatchStatus);
 }
+
+
+/*
+  dispatchEvent({
+    event,
+    args: ['a', 'b', 'c'],
+    headers: {
+      ghost: true,
+      bubbling: true,
+      ignoreLinkedEvents: true,
+      trickle: true
+      dispatchOrder: ['self', 'linked', 'trickle', 'bubble'],
+    }
+  });
+*/
 
 const dispatchEvent = function(payload) {
-  payload.event.validateNextDispatch({
-    ready: onDispatchReady(payload),
-    rejected: onDispatchRejected(payload)
-  });
+  const globalContext = {
+    eventBlacklist: {},
+    catalyst: payload.event,
+    headers: payload.headers,
+
+    _dispatchEvent: function(_payload) {
+      _payload.event.validateNextDispatch({
+        ready: [onDispatchReady, [_payload, this]],
+        rejected: [onDispatchRejected]
+      });
+    }
+  }
+
+  globalContext._dispatchEvent(payload);
 }
 
 
@@ -611,6 +667,17 @@ const unsetGhost = function() {
 
     }
   });
+
+  new:
+
+  func(status, ...args) {
+
+  }
+
+  validateNextDispatch({
+    ready: [func, [...args]],
+    rejected: [func, [...args]]
+  });
 */
 const validateNextDispatch = function(caseHandler = {}) {
   const { 
@@ -625,8 +692,13 @@ const validateNextDispatch = function(caseHandler = {}) {
 
   const highestPriority = _cpo[_cpo.length - 1];
 
-  const sendStatus = (status, ...args) => {
-    if (caseHandler[status]) caseHandler[status](...args)
+  const sendStatus = (state, status) => {
+    const _case = caseHandler[state];
+
+    if (_case) {
+      const [handler, args] = _case;
+      handler(status, ...(args || []))
+    }
   }
 
   /*
@@ -737,14 +809,21 @@ const Event = (parentEvent, settings) => {
         duration: 0,
         reset: 0,
       },
-
-      dispatchLimit: 1,
-      ghost: boolean
       */
       dispatchLimit: Infinity,
       linkedEvents: [],
-      bubbling: false,
 
+      dispatchOrder: [
+        DispatchOrder.Catalyst,
+        DispatchOrder.LinkedEvents,
+        DispatchOrder.DescendantEvents,
+        DispatchOrder.AscendantEvents
+      ],
+
+      bubbling: false,
+      ghost: false,
+
+      // custom event settings
       ...settings
     },
 
