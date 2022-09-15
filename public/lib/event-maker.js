@@ -58,7 +58,8 @@ const {
   objectMeetsCriteria,
   toUpperCamelCase,
   objectHasNoKeys,
-  objectValuesAreUndefined
+  objectValuesAreUndefined,
+  getSubsetOfObject
 } = require('../../lib/helpers');
 
 // @todo: create a separate file for enum values
@@ -173,11 +174,25 @@ const getPriorityHandlerArgs = function(priority, connectionFilter) {
       
   @returns <void>
 */
-const dispatchEvent = function(payload, ...args) {
-  const { 
-    event, 
-    caller, 
-    extensions = {},
+const recurseUpstream = () => {
+
+}
+
+const recurseDownstream = () => {
+
+}
+
+const onDispatchReady = payload => {
+  const DispatchStatus = EventEnums.DispatchStatus;
+
+  const {
+    event,
+    args,
+    _headers = {
+      // fireDescendants
+      // ignoreLinkedEvents
+      // dispatchOrder: ['self', 'linked', 'trickle', 'bubble']
+    },
   } = payload;
 
   const {
@@ -185,127 +200,78 @@ const dispatchEvent = function(payload, ...args) {
     _connectionPriorityOrder: _cpo,
     _pausePriority,
     _resolvers,
+    settings: eventSettings,
     settings: { linkedEvents },
     stats
   } = event;
 
-  const _extensions = {
-    ...caller.settings,
-    ...extensions
+  // list of temporary settings for event
+  const headers = {
+    dispatchOrder: [],
+    ...eventSettings,
+    ..._headers
   }
 
-  console.log('extensions: ', _extensions);
+  return dispatchStatus => {
+    stats.dispatchCount++;
+    event._propagating = true;
 
-  const DispatchStatus = EventEnums.DispatchStatus;
+    console.log('running dispatch with status: ', dispatchStatus);
 
-  const onDispatchReady = status => {
-    if (status !== DispatchStatus.Ghost) {
-      stats.dispatchCount++;
-
+    // SELF DISPATCH TYPE
+    if (!headers.ghost) {
       for (let i = _cpo.length - 1; i > _pausePriority; i--) {
         const connectionRow = _connectionPriorities[_cpo[i]];
         const connectionList = connectionRow.connections;
-  
+
         for (let j = 0; j < connectionList.length; j++) {
           const connection = connectionList[j];
-          connection.handler(caller, ...args);
+          connection.handler(event, ...args);
         }
       }
     }
 
-    caller._propagating = true;
-  }
+    // fire all waiting resolvers
+    for (let i = 0; i < _resolvers.length; i++) {
+      const [resolver, timeoutId] = _resolvers[i];
 
-  if (!event.validateNextDispatch({ ready: onDispatchReady })) {
-    return;
-  }
+      if (timeoutId) clearInterval(timeoutId);
 
-  // fire all waiting resolvers
-  for (let i = 0; i < _resolvers.length; i++) {
-    const [resolver, timeoutId] = _resolvers[i];
+      resolver([...args]);
+      _resolvers.splice(i, 1);
+    }
 
-    if (timeoutId) clearInterval(timeoutId);
-
-    resolver([...args]);
-    _resolvers.splice(i, 1);
-  }
-
-  if (linkedEvents.length > 0) {
-    for (let i = 0; i < linkedEvents.length; i++) {
-      const linkedEvent = linkedEvents[i];
-      dispatchEvent({
-        event: linkedEvent,
-        caller: caller,
-        extensions: { 
-          // continuePropagation: doesn't set _propagating to false after firing other branched events
-          continuePropagation: true,
-          // bubbling: linkedEvent.settings.bubbling
-        }
-      }, ...args);
+    // LINKED DISPATCH TYPE
+    if (linkedEvents.length > 0 && !headers.ignoreLinkedEvents) {
+      for (let i = 0; i < linkedEvents.length; i++) {
+        const linkedEvent = linkedEvents[i];
+        dispatchEvent({
+          event: linkedEvent,
+          args,
+          extensions: { 
+            // continuePropagation: doesn't set _propagating to false after firing other branched events
+            continuePropagation: true,
+            // bubbling: linkedEvent.settings.bubbling
+          }
+        });
+      }
     }
   }
-
-  if (_extensions.bubbling && event._parentEvent && caller._propagating) {
-    dispatchEvent({
-      caller: event,
-      event: event._parentEvent,
-      extensions: _extensions,
-    }, ...args);
-
-  }
-
-  // not necessary to set _propagating back to false but helps for readability in the console
-  // _propagating will remain true if continuePropagation is enabled and a parent event exists
-  // todo: reduce logic here for computing _propagating state
-  caller._propagating = (_extensions.continuePropagation && event._parentEvent) || true;
 }
 
-
-const recursiveDispatch = (payload, ...args) => {
-  const {
-    headers = {
-      // deferBubbling<boolean>
-    },
-    dispatchPayload,
-  } = payload;
-
-  const recurse = nextEvent => {
-    const childEvents = nextEvent._childEvents;
-
-    for (let i = 0; i < childEvents.length; i++) {
-      const event = childEvents[i];
-
-      dispatchEvent({
-        event,
-        caller: dispatchPayload.caller,
-        extensions: {
-          bubbling: false
-        }
-      }, ...args);
-
-      recurse(event);
-    }
+const onDispatchRejected = payload => {
+  return dispatchStatus => {
+    console.log('dispatch failed: ', dispatchStatus);
   }
-
-  // @todo: this is a super ugly solution, remember to do something about this
-  dispatchEvent({
-    ...dispatchPayload, 
-    extensions: {
-      ...dispatchPayload.extensions,
-      bubbling: !headers.deferBubbling
-    }
-  }, ...args);
-
-  recurse(dispatchPayload.event);
-
-  // dispatchEvent({ 
-  //   ...dispatchPayload, 
-  //   extensions: {
-  //     ghost: true,
-  //     bubbling: headers.deferBubbling
-  //   }
-  // }, ...args);
 }
+
+const dispatchEvent = function(payload) {
+  payload.event.validateNextDispatch({
+    ready: onDispatchReady(payload),
+    rejected: onDispatchRejected(payload)
+  });
+}
+
 
 
 /*
@@ -530,7 +496,6 @@ const disconnectWithPriority = function(priority, connectionFilter) {
     for (let j = connectionList.length - 1; j >= 0; j--) {
       const connection = connectionList[j];
       if (disconnectOverride || filterIsPopulated && connectionPassesFilter(connection, connectionFilter)) {
-        // console.log('disconnectOverride: ', disconnectOverride, ' | passed filter: ', connectionPassesFilter(connection, connectionFilter));
         connectionList.splice(j, 1);
       }
     }
@@ -776,6 +741,7 @@ const Event = (parentEvent, settings) => {
       dispatchLimit: 1,
       ghost: boolean
       */
+      dispatchLimit: Infinity,
       linkedEvents: [],
       bubbling: false,
 
@@ -818,6 +784,7 @@ module.exports = {
   Event,
   EventEnums,
   getPriority,
-  isConnectionType
+  isConnectionType,
+  dispatchEvent
 }
 

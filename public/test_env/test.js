@@ -1,19 +1,43 @@
 const {modelArgs, modelArgs_beta, objectValuesAreUndefined} = require('../../lib/helpers');
 const inspect = require('util').inspect;
-const { Event, EventEnums } = require('../lib/event-maker');
+const { Event, EventEnums, dispatchEvent } = require('../lib/event-maker');
 
 const show = obj => console.log(inspect(obj, {showHidden: false, depth: null, colors: true}));
 
-const greatGrandparentEvent = Event();
-const grandParentEvent = Event(greatGrandparentEvent, { grandparent: true });
-const parentEvent = Event(grandParentEvent, { bubbling: true, dispatchLimit: 500, x: 9 });
-const childEvent = Event(parentEvent, { bubbling: true, dispatchLimit: 2 });
+const parent = Event();
+const event = Event(parent);
+
+parent.connect(() => console.log('parent fired'));
+event.connect(() => console.log('fired event 1'));
+
+dispatchEvent({
+  event,
+  args: ['a', 'b', 'c'],
+  /*
+    headers: {
+      ghost: true,
+      bubbling: true,
+      ignoreLinkedEvents: true,
+      trickle: true
+      dispatchOrder: ['self', 'linked', 'trickle', 'bubble'],
+    }
+  */
+  extensions: {
+    // ghost: true,
+    // bubbling: true
+  },
+});
+
+// const greatGrandparentEvent = Event();
+// const grandParentEvent = Event(greatGrandparentEvent, { grandparent: true });
+// const parentEvent = Event(grandParentEvent, { bubbling: true, dispatchLimit: 500, x: 9 });
+// const childEvent = Event(parentEvent, { bubbling: true, dispatchLimit: 2 });
 
 // grandParentEvent.connect(() => console.log('grandpa fired'));
-childEvent.connect('name1', () => console.log('CHILD event with prio 0'));
-parentEvent.connect('name1', () => console.log('PARENT event 1'));
-grandParentEvent.connect('name2', () => console.log('GRANDPARENT event 2'));
-greatGrandparentEvent.connect('name3', () => console.log('GREATGRANDPARENT event 3'));
+// childEvent.connect('name1', () => console.log('CHILD event with prio 0'));
+// parentEvent.connect('name1', () => console.log('PARENT event 1'));
+// grandParentEvent.connect('name2', () => console.log('GRANDPARENT event 2'));
+// greatGrandparentEvent.connect('name3', () => console.log('GREATGRANDPARENT event 3'));
 // const c = childEvent.connectWithPriority(3, { handler: (e) => console.log('CHILD event with prio 3', e.hello) });
 // childEvent.connectWithPriority(5, { handler: (e) => {console.log('CHILD event with prio 5'); e.hello='sup'} });
 // parentEvent.connect(() => console.log('PARENT event fired'));
@@ -21,7 +45,7 @@ greatGrandparentEvent.connect('name3', () => console.log('GREATGRANDPARENT event
 
 // childEvent.setGhost();
 // parentEvent.setGhost();
-childEvent.fire();
+// childEvent.fire();
 // childEvent.fire();
 // show(childEvent);
 
