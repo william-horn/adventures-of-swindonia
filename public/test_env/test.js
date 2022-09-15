@@ -1,20 +1,23 @@
 const {modelArgs, modelArgs_beta, objectValuesAreUndefined} = require('../../lib/helpers');
 const inspect = require('util').inspect;
-const { Event } = require('../lib/event-maker');
+const { Event, EventEnums } = require('../lib/event-maker');
 
 const show = obj => console.log(inspect(obj, {showHidden: false, depth: null, colors: true}));
 
 const grandParentEvent = Event()
-const parentEvent = Event(grandParentEvent);
+const parentEvent = Event(grandParentEvent, { bubbling: true });
 const childEvent = Event(parentEvent, { bubbling: true, dispatchLimit: 4 });
 
+grandParentEvent.connect(() => console.log('grandpa fired'));
 childEvent.connect('name1', () => console.log('CHILD event with prio 0'));
 const c = childEvent.connectWithPriority(3, { handler: (e) => console.log('CHILD event with prio 3', e.hello) });
 childEvent.connectWithPriority(5, { handler: (e) => {console.log('CHILD event with prio 5'); e.hello='sup'} });
 parentEvent.connect(() => console.log('PARENT event fired'));
 
 
-childEvent.fire();
+// childEvent.setGhost();
+// parentEvent.setGhost();
+childEvent.fireAll();
 
 // const event = Event();
 // const handler = () => console.log('event handler fired');

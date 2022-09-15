@@ -46,7 +46,7 @@ todo: implement pause/resume mechanic for events
 todo: implement event connection strength/priorities
   * DONE - 09/13/2022
 todo: add error handling and centralize error messages
-
+todo: replace all 'doAll()' methods with a better recursive option that includes headers and metadata
 ==================================================================================================================================
 */
 
@@ -61,6 +61,7 @@ const {
   objectValuesAreUndefined
 } = require('../../lib/helpers');
 
+// @todo: create a separate file for enum values
 const EventEnums = {
   ConnectionPriority: {
     Weak: 0,
@@ -79,10 +80,16 @@ const EventEnums = {
     EventInstance: 'EventInstance'
   },
 
-  // ConnectionFilters: {
-  //   Name: 'name',
-  //   Handler: 'handler',
-  // }
+  DispatchStatus: {
+    Disabled: 'Disabled',
+    Ghost: 'Ghost',
+    NoConnection: 'NoConnection',
+    PriorityPaused: 'PriorityPaused',
+    DispatchLimitReached: 'DispatchLimitReached',
+    AllListening: 'AllListening',
+    PriorityListening: 'PriorityListening'
+  }
+
 }
 
 const getPriority = (priority, disableException) => {
@@ -187,16 +194,19 @@ const dispatchEvent = function(payload, ...args) {
     ...extensions
   }
 
-  if (!event.validateNextDispatch()) {
+  const DispatchStatus = EventEnums.DispatchStatus;
+
+  const onDispatchReady = status => {
+    if (status !== DispatchStatus.Ghost) stats.dispatchCount++;
+    caller._propagating = true;
+  }
+
+  if (!event.validateNextDispatch({ ready: onDispatchReady })) {
     return;
   }
 
-  caller._propagating = true;
-  stats.dispatchCount++;
-
   // if event isn't ghosted then fire self connections
   if (!ghost) {
-
     for (let i = _cpo.length - 1; i > _pausePriority; i--) {
       const connectionRow = _connectionPriorities[_cpo[i]];
       const connectionList = connectionRow.connections;
@@ -206,7 +216,6 @@ const dispatchEvent = function(payload, ...args) {
         connection.handler(caller, ...args);
       }
     }
-
   }
 
   // fire all waiting resolvers
@@ -287,13 +296,13 @@ const recursiveDispatch = (payload, ...args) => {
 
   recurse(dispatchPayload.event);
 
-  dispatchEvent({ 
-    ...dispatchPayload, 
-    extensions: {
-      ghost: true,
-      bubbling: headers.deferBubbling
-    }
-  }, ...args);
+  // dispatchEvent({ 
+  //   ...dispatchPayload, 
+  //   extensions: {
+  //     ghost: true,
+  //     bubbling: headers.deferBubbling
+  //   }
+  // }, ...args);
 }
 
 
@@ -429,15 +438,27 @@ const fire = function(...args) {
   to avoid an infinite event loop
 */
 const fireAll = function(...args) {
-  recursiveDispatch({
-    headers: {
-      deferBubbling: true
-    },
-    dispatchPayload: {
-      event: this,
-      caller: this,
-    }
-  }, ...args);
+  // recursiveDispatch({
+  //   headers: {
+  //     deferBubbling: true
+  //   },
+  //   dispatchPayload: {
+  //     event: this,
+  //     caller: this,
+  //   }
+  // }, ...args);
+
+  // dispatchEvent({
+  //   event: thing,
+  //   headers: {
+  //     recursive: true,
+  //     deferBubbling: true
+  //   },
+  //   extensions: {
+  //     bubbling: false,
+  //     ghost: false
+  //   },
+  // });
 }
 
 /*
@@ -525,13 +546,13 @@ const disconnectWithPriority = function(priority, connectionFilter) {
   @returns <void>
 */
 const disconnectAll = function(...args) {
-  this.disconnect(...args);
-  recurse(this._childEvents, 'disconnectAll', ...args);
+  // this.disconnect(...args);
+  // recurse(this._childEvents, 'disconnectAll', ...args);
 }
 
 const disconnectAllWithPriority = function(...args) {
-  this.disconnectWithPriority(...args);
-  recurse(this._childEvents, 'disconnectAllWithPriority', ...args);
+  // this.disconnectWithPriority(...args);
+  // recurse(this._childEvents, 'disconnectAllWithPriority', ...args);
 }
 
 const wait = function(timeout) {
@@ -645,44 +666,46 @@ const validateNextDispatch = function(caseHandler = {}) {
     Begin case-checking 
   */
 
+  const DispatchStatus = EventEnums.DispatchStatus;
+
   // event has been disabled
   if (!this.isEnabled()) {
-    sendStatus('rejected', 'isDisabled');
+    sendStatus('rejected', DispatchStatus.Disabled);
     return false;
   }
 
   if (this.ghost) {
-    sendStatus('ready', 'isGhost');
+    sendStatus('ready', DispatchStatus.Ghost);
     return true;
   }
 
   // connections list is empty; no connections exist
   if (_cpo.length === 0) {
-    sendStatus('rejected', 'noConnection');
+    sendStatus('rejected', DispatchStatus.NoConnection);
     return false;
   }
 
   // all connections are paused
   if (_pausePriority >= highestPriority) {
-    sendStatus('rejected', 'priorityPaused');
+    sendStatus('rejected', DispatchStatus.PriorityPaused);
     return false;
   }
 
   // event exceeded dispatch limit set by user
   if (dispatchCount > dispatchLimit) {
-    sendStatus('rejected', 'dispatchLimitReached');
+    sendStatus('rejected', DispatchStatus.DispatchLimitReached);
     return false;
   }
 
   // event is in listening state
   if (this.isListening()) {
-    sendStatus('ready', 'allListening');
+    sendStatus('ready', DispatchStatus.AllListening);
     return true;
   }
   
   // event state is paused but higher connection priorities exist
   if (highestPriority > _pausePriority) {
-    sendStatus('ready', 'priorityListening');
+    sendStatus('ready', DispatchStatus.PriorityListening);
     return true;
   }
 }
