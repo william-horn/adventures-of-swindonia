@@ -100,12 +100,6 @@ const isConnectionType = connection => {
     && connection._customType === EventEnums.InstanceType.EventConnection;
 }
 
-const recurse = (list, method, ...args) => {
-  for (let i = 0; i < list.length; i++) {
-    list[i][method](...args);
-  }
-}
-
 /*
   find connection list and connection index of a given connection
 */
@@ -161,7 +155,7 @@ const getPriorityHandlerArgs = function(priority, connectionFilter) {
     payload {
       caller<EventInstance> { ... },
       event<EventInstance> { ... },
-      signature?<object> {
+      extensions?<object> {
         bubbling?<boolean>,
         continuePropagation?<boolean>
       }
@@ -173,20 +167,24 @@ const getPriorityHandlerArgs = function(priority, connectionFilter) {
   @returns <void>
 */
 const dispatchEvent = function(payload, ...args) {
-  const { event, caller, signature = {} } = payload;
+  const { 
+    event, 
+    caller, 
+    extensions = {},
+  } = payload;
 
   const {
     _connectionPriorities,
     _connectionPriorityOrder: _cpo,
     _pausePriority,
     _resolvers,
-    settings: { linkedEvents },
+    settings: { linkedEvents, ghost },
     stats
   } = event;
 
-  const _signature = {
+  const _extensions = {
     ...caller.settings,
-    ...signature
+    ...extensions
   }
 
   if (!event.validateNextDispatch()) {
@@ -196,17 +194,22 @@ const dispatchEvent = function(payload, ...args) {
   caller._propagating = true;
   stats.dispatchCount++;
 
-  for (let i = _cpo.length - 1; i > _pausePriority; i--) {
-    const connectionRow = _connectionPriorities[_cpo[i]];
-    const connectionList = connectionRow.connections;
+  // if event isn't ghosted then fire self connections
+  if (!ghost) {
 
-    for (let j = 0; j < connectionList.length; j++) {
-      const connection = connectionList[j];
-      connection.handler(caller, ...args);
+    for (let i = _cpo.length - 1; i > _pausePriority; i--) {
+      const connectionRow = _connectionPriorities[_cpo[i]];
+      const connectionList = connectionRow.connections;
+
+      for (let j = 0; j < connectionList.length; j++) {
+        const connection = connectionList[j];
+        connection.handler(caller, ...args);
+      }
     }
+
   }
 
-  // fire all wait resolvers
+  // fire all waiting resolvers
   for (let i = 0; i < _resolvers.length; i++) {
     const [resolver, timeoutId] = _resolvers[i];
 
@@ -222,20 +225,20 @@ const dispatchEvent = function(payload, ...args) {
       dispatchEvent({
         event: linkedEvent,
         caller: caller,
-        signature: { 
+        extensions: { 
           // continuePropagation: doesn't set _propagating to false after firing other branched events
           continuePropagation: true,
-          bubbling: linkedEvent.settings.bubbling
+          // bubbling: linkedEvent.settings.bubbling
         }
       }, ...args);
     }
   }
 
-  if (_signature.bubbling && event._parentEvent && caller._propagating) {
+  if (_extensions.bubbling && event._parentEvent && caller._propagating) {
     dispatchEvent({
       caller: event,
       event: event._parentEvent,
-      signature: _signature,
+      extensions: _extensions,
     }, ...args);
 
   }
@@ -243,9 +246,55 @@ const dispatchEvent = function(payload, ...args) {
   // not necessary to set _propagating back to false but helps for readability in the console
   // _propagating will remain true if continuePropagation is enabled and a parent event exists
   // todo: reduce logic here for computing _propagating state
-  caller._propagating = (_signature.continuePropagation && event._parentEvent) || true;
+  caller._propagating = (_extensions.continuePropagation && event._parentEvent) || true;
 }
 
+
+const recursiveDispatch = (payload, ...args) => {
+  const {
+    headers = {
+      // deferBubbling<boolean>
+    },
+    dispatchPayload,
+  } = payload;
+
+  const recurse = nextEvent => {
+    const childEvents = nextEvent._childEvents;
+
+    for (let i = 0; i < childEvents.length; i++) {
+      const event = childEvents[i];
+
+      dispatchEvent({
+        event,
+        caller: dispatchPayload.caller,
+        extensions: {
+          bubbling: false
+        }
+      }, ...args);
+
+      recurse(event);
+    }
+  }
+
+  // @todo: this is a super ugly solution, remember to do something about this
+  dispatchEvent({
+    ...dispatchPayload, 
+    extensions: {
+      ...dispatchPayload.extensions,
+      bubbling: !headers.deferBubbling
+    }
+  }, ...args);
+
+  recurse(dispatchPayload.event);
+
+  dispatchEvent({ 
+    ...dispatchPayload, 
+    extensions: {
+      ghost: true,
+      bubbling: headers.deferBubbling
+    }
+  }, ...args);
+}
 
 
 /*
@@ -375,17 +424,20 @@ const fire = function(...args) {
     The arguments passed down to the handler function callbacks
 
   @returns <void>
+
+  @bug: currently fireAll() won't bubble upward because it temporarily disables bubbling
+  to avoid an infinite event loop
 */
 const fireAll = function(...args) {
-  dispatchEvent({
-    event: this,
-    caller: this,
-    signature: {
-      bubbling: false
+  recursiveDispatch({
+    headers: {
+      deferBubbling: true
+    },
+    dispatchPayload: {
+      event: this,
+      caller: this,
     }
   }, ...args);
-
-  recurse(this._childEvents, 'fireAll', ...args);
 }
 
 /*
@@ -417,20 +469,19 @@ const fireAll = function(...args) {
   @todo: come back and see if we can shorten the params to ...args
 */
 const disconnect = function(name, handler) {
-  return this.disconnectWithPriority(0, { name, handler })
+  return this.disconnectWithPriority(0, name && { name, handler })
 }
 
 const disconnectWithPriority = function(priority, connectionFilter) {
   const disconnectOverride = !connectionFilter;
-
-  [priority, connectionFilter] = getPriorityHandlerArgs(priority, connectionFilter);
-  arrangeConnectionFilterArgs(connectionFilter);
-
   const { _connectionPriorities, _connectionPriorityOrder: _cpo } = this;
+  [priority, connectionFilter] = getPriorityHandlerArgs(priority, connectionFilter);
 
-  // console.log('disconnectWithPriority args: ', priority, connectionFilter);
-  // console.log('disconnect CONNECTION DATA: ', priority, connectionFilter);
+  // connectionFilter is defined with keys: { name, handler, connection } from this point on
+  arrangeConnectionFilterArgs(connectionFilter);
+  const filterIsPopulated = !objectValuesAreUndefined(connectionFilter);
 
+  // handle special case where connection instance is given
   const connectionInstanceData = findConnectionInstance(connectionFilter.connection, _connectionPriorities);
   if (connectionInstanceData) {
     connectionInstanceData.list.splice(connectionInstanceData.index, 1);
@@ -448,13 +499,6 @@ const disconnectWithPriority = function(priority, connectionFilter) {
   */
   // if (typeof priorityIndex === 'undefined') throw 'No such priority number exists';
   if (typeof priorityIndex === 'undefined') return;
-
-  /*
-    @todo: we're checking to see if no arguments were passed every cycle of
-    the for loop for disconnection (objectHasNoKeys(connectionFilter)). Maybe add separate 
-    condition if no arguments were passed, then disconnect all without checking?
-  */
-  const filterIsPopulated = !objectValuesAreUndefined(connectionFilter);
 
   for (let i = 0; i <= priorityIndex; i++) {
     const connectionRow = _connectionPriorities[_cpo[i]];
@@ -556,6 +600,14 @@ const isListening = function() {
   return this._pausePriority === -1;
 }
 
+const setGhost = function() {
+  this.settings.ghost = true;
+}
+
+const unsetGhost = function() {
+  this.settings.ghost = false;
+}
+
 /*
   validateNextDispatch({ 
     ready: (state) => {
@@ -576,7 +628,7 @@ const validateNextDispatch = function(caseHandler = {}) {
   const { 
     _connectionPriorityOrder: _cpo, 
     _pausePriority,
-    settings: { dispatchLimit },
+    settings: { dispatchLimit, ghost },
     stats: { 
       timeLastDispatched,
       dispatchCount
@@ -597,6 +649,11 @@ const validateNextDispatch = function(caseHandler = {}) {
   if (!this.isEnabled()) {
     sendStatus('rejected', 'isDisabled');
     return false;
+  }
+
+  if (this.ghost) {
+    sendStatus('ready', 'isGhost');
+    return true;
   }
 
   // connections list is empty; no connections exist
@@ -692,6 +749,7 @@ const Event = (parentEvent, settings) => {
       },
 
       dispatchLimit: 1,
+      ghost: boolean
       */
       linkedEvents: [],
       bubbling: false,
@@ -720,6 +778,8 @@ const Event = (parentEvent, settings) => {
     wait,
     isEnabled,
     isListening,
+    setGhost,
+    unsetGhost,
     stopPropagating
   }
 
