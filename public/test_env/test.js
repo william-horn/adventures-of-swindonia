@@ -4,20 +4,26 @@ const { Event, EventEnums } = require('../lib/event-maker');
 
 const show = obj => console.log(inspect(obj, {showHidden: false, depth: null, colors: true}));
 
-const grandParentEvent = Event()
-const parentEvent = Event(grandParentEvent, { bubbling: true });
-const childEvent = Event(parentEvent, { bubbling: true, dispatchLimit: 4 });
+const greatGrandparentEvent = Event();
+const grandParentEvent = Event(greatGrandparentEvent, { grandparent: true });
+const parentEvent = Event(grandParentEvent, { bubbling: true, dispatchLimit: 500, x: 9 });
+const childEvent = Event(parentEvent, { bubbling: true, dispatchLimit: 2 });
 
-grandParentEvent.connect(() => console.log('grandpa fired'));
+// grandParentEvent.connect(() => console.log('grandpa fired'));
 childEvent.connect('name1', () => console.log('CHILD event with prio 0'));
-const c = childEvent.connectWithPriority(3, { handler: (e) => console.log('CHILD event with prio 3', e.hello) });
-childEvent.connectWithPriority(5, { handler: (e) => {console.log('CHILD event with prio 5'); e.hello='sup'} });
-parentEvent.connect(() => console.log('PARENT event fired'));
+parentEvent.connect('name1', () => console.log('PARENT event 1'));
+grandParentEvent.connect('name2', () => console.log('GRANDPARENT event 2'));
+greatGrandparentEvent.connect('name3', () => console.log('GREATGRANDPARENT event 3'));
+// const c = childEvent.connectWithPriority(3, { handler: (e) => console.log('CHILD event with prio 3', e.hello) });
+// childEvent.connectWithPriority(5, { handler: (e) => {console.log('CHILD event with prio 5'); e.hello='sup'} });
+// parentEvent.connect(() => console.log('PARENT event fired'));
 
 
 // childEvent.setGhost();
 // parentEvent.setGhost();
-childEvent.fireAll();
+childEvent.fire();
+// childEvent.fire();
+// show(childEvent);
 
 // const event = Event();
 // const handler = () => console.log('event handler fired');

@@ -185,7 +185,7 @@ const dispatchEvent = function(payload, ...args) {
     _connectionPriorityOrder: _cpo,
     _pausePriority,
     _resolvers,
-    settings: { linkedEvents, ghost },
+    settings: { linkedEvents },
     stats
   } = event;
 
@@ -194,28 +194,30 @@ const dispatchEvent = function(payload, ...args) {
     ...extensions
   }
 
+  console.log('extensions: ', _extensions);
+
   const DispatchStatus = EventEnums.DispatchStatus;
 
   const onDispatchReady = status => {
-    if (status !== DispatchStatus.Ghost) stats.dispatchCount++;
+    if (status !== DispatchStatus.Ghost) {
+      stats.dispatchCount++;
+
+      for (let i = _cpo.length - 1; i > _pausePriority; i--) {
+        const connectionRow = _connectionPriorities[_cpo[i]];
+        const connectionList = connectionRow.connections;
+  
+        for (let j = 0; j < connectionList.length; j++) {
+          const connection = connectionList[j];
+          connection.handler(caller, ...args);
+        }
+      }
+    }
+
     caller._propagating = true;
   }
 
   if (!event.validateNextDispatch({ ready: onDispatchReady })) {
     return;
-  }
-
-  // if event isn't ghosted then fire self connections
-  if (!ghost) {
-    for (let i = _cpo.length - 1; i > _pausePriority; i--) {
-      const connectionRow = _connectionPriorities[_cpo[i]];
-      const connectionList = connectionRow.connections;
-
-      for (let j = 0; j < connectionList.length; j++) {
-        const connection = connectionList[j];
-        connection.handler(caller, ...args);
-      }
-    }
   }
 
   // fire all waiting resolvers
@@ -674,7 +676,7 @@ const validateNextDispatch = function(caseHandler = {}) {
     return false;
   }
 
-  if (this.ghost) {
+  if (ghost) {
     sendStatus('ready', DispatchStatus.Ghost);
     return true;
   }
@@ -692,7 +694,7 @@ const validateNextDispatch = function(caseHandler = {}) {
   }
 
   // event exceeded dispatch limit set by user
-  if (dispatchCount > dispatchLimit) {
+  if (dispatchCount >= dispatchLimit) {
     sendStatus('rejected', DispatchStatus.DispatchLimitReached);
     return false;
   }
